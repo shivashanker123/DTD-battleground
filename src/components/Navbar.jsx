@@ -1,136 +1,71 @@
 import React from 'react';
-import {
-  Terminal,
-  Trophy,
-  Users,
-  History,
-  ShieldAlert,
-  Clock,
-  CheckCircle2,
-  LogOut
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useCTF } from '../context/CTFContext';
+import { Gamepad2, Trophy, BookOpen, LogOut } from 'lucide-react';
+import { useEvent, useServerNow } from '../context/EventContext';
+import { Countdown, PHASE_LABELS } from './ui';
+
+const TABS = [
+  { id: 'play', label: 'Play', icon: Gamepad2 },
+  { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+  { id: 'rules', label: 'Rules', icon: BookOpen }
+];
 
 export const Navbar = ({ currentTab, setCurrentTab }) => {
-  const { currentUser, logout } = useAuth();
-  const { challenges, isChallengeSolved, remainingSeconds, formatCountdown } = useCTF();
-
-  const totalChallenges = challenges.length;
-  const solvedCount = challenges.filter((c) => isChallengeSolved(c.id)).length;
+  const { state, offset, me, signOut } = useEvent();
+  const now = useServerNow(offset, 1000);
+  const timer = state?.timers?.[state.phase];
+  const myRow = me && state.standings.qualification.find((r) => r.teamId === me.teamId);
+  const finalRow = me && state.standings.final.find((r) => r.teamId === me.teamId);
+  const inFinal = ['round3', 'finished'].includes(state?.phase);
+  const score = inFinal && finalRow ? finalRow.score : myRow?.total;
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-2xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand Logo & Event Title: DTD — Decode The Data, highlighting dark Data Science Club, no D box */}
-          <div
-            className="flex flex-col cursor-pointer text-left"
-            onClick={() => setCurrentTab('challenges')}
-          >
-            <div className="flex items-center space-x-2">
-              <span className="font-black text-slate-900 tracking-tight text-lg">
-                DTD — Decode The Data
-              </span>
-            </div>
-            <div className="flex items-center">
-              <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded">
-                Data Science Club
-              </span>
-            </div>
-          </div>
+        <div className="flex items-center justify-between h-16 gap-3">
+          <button type="button" className="flex flex-col text-left" onClick={() => setCurrentTab('play')}>
+            <span className="font-black text-slate-900 tracking-tight text-lg">DTD Battleground</span>
+            <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded self-start">
+              Data Science Club
+            </span>
+          </button>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
-            <button
-              onClick={() => setCurrentTab('challenges')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                currentTab === 'challenges'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Terminal className="w-4 h-4" />
-              <span>Challenges</span>
-            </button>
-            <button
-              onClick={() => setCurrentTab('scoreboard')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                currentTab === 'scoreboard'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Trophy className="w-4 h-4" />
-              <span>Scoreboard</span>
-            </button>
-            <button
-              onClick={() => setCurrentTab('teams')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                currentTab === 'teams'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Teams</span>
-            </button>
-            <button
-              onClick={() => setCurrentTab('submissions')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                currentTab === 'submissions'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <History className="w-4 h-4" />
-              <span>Live Feed</span>
-            </button>
-            <button
-              onClick={() => setCurrentTab('admin')}
-              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                currentTab === 'admin'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <ShieldAlert className="w-4 h-4 text-amber-500" />
-              <span>Admin</span>
-            </button>
+          <nav className="hidden md:flex items-center gap-1 lg:gap-2" aria-label="Main">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCurrentTab(id)}
+                aria-current={currentTab === id ? 'page' : undefined}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  currentTab === id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Icon className="w-4 h-4" aria-hidden />
+                <span>{label}</span>
+              </button>
+            ))}
           </nav>
 
-          {/* Right Action Items: Timer, Solves Badge, Participant & Team info */}
-          <div className="flex items-center space-x-3">
-            {/* Live Countdown Timer */}
-            <div className="hidden lg:flex items-center space-x-2 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-medium">
-              <Clock className="w-3.5 h-3.5 text-slate-700" />
-              <span>{formatCountdown(remainingSeconds)}</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600">{PHASE_LABELS[state?.phase]}</span>
+              {timer && timer.endsAt > now && <Countdown endsAt={timer.endsAt} now={now} size="sm" urgentBelow={60_000} />}
             </div>
-
-            {/* Solved Progress Counter */}
-            {currentUser && (
-              <div className="hidden sm:flex items-center space-x-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>
-                  {solvedCount} / {totalChallenges} Solved
-                </span>
-              </div>
-            )}
-
-            {/* Real entered Participant Name and Team Name */}
-            {currentUser && (
-              <div className="flex items-center space-x-2">
+            {me && (
+              <div className="flex items-center gap-2">
                 <div className="text-right leading-tight hidden sm:block">
-                  <p className="text-xs font-extrabold text-slate-900">{currentUser.name}</p>
-                  <p className="text-[10px] font-semibold text-slate-500">Team: {currentUser.teamName}</p>
+                  <p className="text-xs font-extrabold text-slate-900">{me.member}</p>
+                  <p className="text-[10px] font-semibold text-slate-500">Team: {me.teamName}</p>
                 </div>
-                <div className="bg-slate-900 text-white font-mono text-xs font-bold px-2.5 py-1 rounded-lg">
-                  {currentUser.score} pts
+                <div className="bg-slate-900 text-white font-mono text-xs font-bold px-2.5 py-1 rounded-lg" title={inFinal ? 'Final score' : 'Round 1 + Round 2'}>
+                  {score ?? 0} pts
                 </div>
                 <button
-                  onClick={logout}
+                  type="button"
+                  onClick={signOut}
                   className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Sign Out"
+                  title="Sign out"
+                  aria-label="Sign out"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -139,48 +74,24 @@ export const Navbar = ({ currentTab, setCurrentTab }) => {
           </div>
         </div>
 
-        {/* Mobile Nav row */}
-        <div className="flex md:hidden items-center justify-between py-2 border-t border-slate-100 overflow-x-auto text-xs space-x-2">
-          <button
-            onClick={() => setCurrentTab('challenges')}
-            className={`px-2.5 py-1 rounded whitespace-nowrap font-medium ${
-              currentTab === 'challenges' ? 'bg-slate-900 text-white' : 'text-slate-600'
-            }`}
-          >
-            Challenges
-          </button>
-          <button
-            onClick={() => setCurrentTab('scoreboard')}
-            className={`px-2.5 py-1 rounded whitespace-nowrap font-medium ${
-              currentTab === 'scoreboard' ? 'bg-slate-900 text-white' : 'text-slate-600'
-            }`}
-          >
-            Scoreboard
-          </button>
-          <button
-            onClick={() => setCurrentTab('teams')}
-            className={`px-2.5 py-1 rounded whitespace-nowrap font-medium ${
-              currentTab === 'teams' ? 'bg-slate-900 text-white' : 'text-slate-600'
-            }`}
-          >
-            Teams
-          </button>
-          <button
-            onClick={() => setCurrentTab('submissions')}
-            className={`px-2.5 py-1 rounded whitespace-nowrap font-medium ${
-              currentTab === 'submissions' ? 'bg-slate-900 text-white' : 'text-slate-600'
-            }`}
-          >
-            Live Feed
-          </button>
-          <button
-            onClick={() => setCurrentTab('admin')}
-            className={`px-2.5 py-1 rounded whitespace-nowrap font-medium ${
-              currentTab === 'admin' ? 'bg-amber-600 text-white' : 'text-slate-600'
-            }`}
-          >
-            Admin
-          </button>
+        <div className="flex md:hidden items-center gap-2 py-2 border-t border-slate-100 overflow-x-auto text-xs">
+          {TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setCurrentTab(id)}
+              className={`px-2.5 py-1 rounded whitespace-nowrap font-medium ${
+                currentTab === id ? 'bg-slate-900 text-white' : 'text-slate-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {timer && timer.endsAt > now && (
+            <span className="ml-auto">
+              <Countdown endsAt={timer.endsAt} now={now} size="sm" urgentBelow={60_000} />
+            </span>
+          )}
         </div>
       </div>
     </header>

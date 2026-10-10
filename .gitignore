@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Battleground server: live event state and the real (secret) question bank
+server/data
+server/questions.json
+dtd-backup.json
+dtd-standings.csv
+
+# Local secrets and tool settings
+.env
+.env.*
+.claude/

@@ -8,4 +8,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    // The game server (npm run server) owns all state; the dev site talks to it through this proxy.
+    proxy: { '/api': `http://localhost:${process.env.PORT || 3001}` },
+  },
 })

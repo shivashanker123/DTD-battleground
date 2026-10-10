@@ -1,461 +1,678 @@
-import React, { useState } from 'react';
-import {
-  ShieldAlert,
-  Plus,
-  Trash2,
-  Lock,
-  Unlock,
-  RotateCcw,
-  KeyRound,
-  LogOut,
-  AlertCircle
-} from 'lucide-react';
-import { useCTF } from '../context/CTFContext';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, Download, LogOut, Monitor, ShieldAlert } from 'lucide-react';
+import { api, adminToken, downloadAdminFile } from '../api';
+import { usePolledState, useServerNow } from '../context/EventContext';
+import { Card, Countdown, ErrorNote, PHASE_LABELS, formatSeconds } from '../components/ui';
+import { FinalBoard, FinalQuestion } from '../components/FinalLive';
 
-export const AdminDashboard = () => {
-  const {
-    challenges,
-    categories,
-    toggleChallengeRelease,
-    addChallenge,
-    deleteChallenge,
-    submissions,
-    resetAllData
-  } = useCTF();
-  const { teams, isAdminAuthenticated, loginAdmin, logoutAdmin } = useAuth();
+const BTN = 'px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed';
+const PRIMARY = `${BTN} bg-slate-900 text-white hover:bg-slate-800`;
+const SECONDARY = `${BTN} bg-slate-100 text-slate-800 hover:bg-slate-200`;
+const DANGER = `${BTN} bg-rose-600 text-white hover:bg-rose-700`;
+const INPUT = 'px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden';
 
-  const [passwordInput, setPasswordInput] = useState('');
-  const [authError, setAuthError] = useState('');
-
-  const [isAddingChallenge, setIsAddingChallenge] = useState(false);
-  const [newChallForm, setNewChallForm] = useState({
-    title: '',
-    category: 'analysis',
-    difficulty: 'Intermediate',
-    points: 200,
-    author: 'Data Science Club',
-    description: '',
-    flagFormat: 'DTD{token_here}',
-    acceptedKey: '',
-    isReleased: true,
-    hasDataset: true,
-    datasetFileName: 'sample_dataset.csv',
-    datasetContent: 'id,metric_a,metric_b\n1,42.5,88.1',
-    hintText: '',
-    hintCost: 15
-  });
-
-  const handleAdminLogin = (e) => {
+const Login = ({ onDone }) => {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const submit = async (e) => {
     e.preventDefault();
-    setAuthError('');
-    const res = loginAdmin(passwordInput.trim());
-    if (!res.success) {
-      setAuthError('Incorrect Admin Password. Access denied.');
-    } else {
-      setPasswordInput('');
+    try {
+      const { token } = await api('/admin/login', { body: { password } });
+      adminToken.set(token);
+      onDone();
+    } catch (err) {
+      setError(err.message);
     }
   };
-
-  const handleFormChange = (field, val) => {
-    setNewChallForm((prev) => ({ ...prev, [field]: val }));
-  };
-
-  const handleCreateChallenge = (e) => {
-    e.preventDefault();
-    if (!newChallForm.title || !newChallForm.acceptedKey) return;
-
-    addChallenge({
-      title: newChallForm.title,
-      category: newChallForm.category,
-      difficulty: newChallForm.difficulty,
-      points: Number(newChallForm.points),
-      author: newChallForm.author,
-      description: newChallForm.description,
-      flagFormat: newChallForm.flagFormat,
-      acceptedKeys: [newChallForm.acceptedKey.trim(), `DTD{${newChallForm.acceptedKey.trim()}}`],
-      isReleased: newChallForm.isReleased,
-      releaseTime: newChallForm.isReleased ? 'Released Live' : 'Scheduled Release',
-      hasDataset: newChallForm.hasDataset,
-      datasetFileName: newChallForm.datasetFileName,
-      datasetContent: newChallForm.datasetContent,
-      hints: newChallForm.hintText
-        ? [{ id: 1, cost: Number(newChallForm.hintCost), text: newChallForm.hintText }]
-        : []
-    });
-
-    setIsAddingChallenge(false);
-    setNewChallForm({
-      title: '',
-      category: 'analysis',
-      difficulty: 'Intermediate',
-      points: 200,
-      author: 'Data Science Club',
-      description: '',
-      flagFormat: 'DTD{token_here}',
-      acceptedKey: '',
-      isReleased: true,
-      hasDataset: true,
-      datasetFileName: 'sample_data.csv',
-      datasetContent: '',
-      hintText: '',
-      hintCost: 15
-    });
-  };
-
-  // If not authenticated as Admin, show Password Protection Gate
-  if (!isAdminAuthenticated) {
-    return (
-      <div className="max-w-md mx-auto my-16 p-6 bg-white rounded-2xl border border-slate-200 shadow-md text-left space-y-5 animate-fade-in">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
-            <Lock className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-black text-slate-900">Admin Control Gate</h2>
-            <p className="text-xs text-slate-500">Restricted to Data Science Club Coordinators</p>
-          </div>
-        </div>
-
-        {authError && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{authError}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleAdminLogin} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Admin Password
-            </label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="password"
-                required
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter password (e.g. admin2026)"
-                className="w-full pl-9 pr-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-hidden"
-              />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Default password: <span className="font-mono font-bold text-slate-600">admin2026</span>
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition-all"
-          >
-            Authenticate & Open Console
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <Card className="p-8 w-full max-w-sm space-y-4 text-left">
+        <h1 className="font-black text-slate-900 text-xl flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-amber-600" aria-hidden /> Organiser console
+        </h1>
+        <form onSubmit={submit} className="space-y-3">
+          <label htmlFor="admin-pass" className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Admin password
+          </label>
+          <input id="admin-pass" type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} className={`${INPUT} w-full`} />
+          <ErrorNote>{error}</ErrorNote>
+          <button type="submit" className={`${PRIMARY} w-full py-2.5`}>
+            Sign in
           </button>
         </form>
-      </div>
-    );
-  }
+        <a href="#/" className="block text-xs text-slate-500 hover:underline">
+          ← Back to the team site
+        </a>
+      </Card>
+    </div>
+  );
+};
 
-  // Once authenticated as Admin
+const Section = ({ title, children, actions }) => (
+  <Card className="p-5 space-y-4 text-left">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="font-black text-slate-900">{title}</h2>
+      {actions}
+    </div>
+    {children}
+  </Card>
+);
+
+// ---------- event control ----------
+
+const PHASE_ACTIONS = {
+  registration: [
+    { phase: 'practice', label: 'Start practice round', secondary: true, confirm: 'Open the unscored practice round? Teams can still register.' },
+    { phase: 'round1', label: 'Start Round 1 (30 min)', confirm: 'Start Round 1 now? The 30-minute timer starts for every team.' }
+  ],
+  practice: [{ phase: 'round1', label: 'End practice, start Round 1 (30 min)', confirm: 'Start Round 1 now? Registration closes and the 30-minute timer starts for every team.' }],
+  round1: [{ phase: 'round1_closed', label: 'End Round 1 now', danger: true, confirm: 'End Round 1 immediately?' }],
+  round1_closed: [{ phase: 'round2_buy', label: 'Open Round 2 market (4 min)', confirm: 'Open the market? Buying lasts 4 minutes, then solving starts automatically.' }],
+  round2_buy: [{ phase: 'round2_solve', label: 'End buying, start solving now', confirm: 'Close the market early and start the 25-minute solve?' }],
+  round2_solve: [{ phase: 'round2_closed', label: 'End Round 2 now', danger: true, confirm: 'End Round 2 immediately?' }],
+  round2_closed: [{ phase: 'round3', label: 'Start the final', confirm: 'Start Round 3? Lock the finalists first.' }],
+  round3: [{ phase: 'finished', label: 'Finish the event', confirm: 'Mark the event finished?' }],
+  finished: []
+};
+
+const EventControl = ({ s, now, run }) => {
+  const timer = s.timers[s.phase];
+  const [manual, setManual] = useState(s.phase);
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
-      {/* Top Admin Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-              DTD Competition Admin Console
-            </h1>
-            <p className="text-xs text-slate-600">
-              Manage live challenge releases, add custom questions, inspect submissions, and reset states.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setIsAddingChallenge(!isAddingChallenge)}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{isAddingChallenge ? 'Close Form' : 'Add New Challenge'}</span>
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm('Reset all competition state to fresh data?')) {
-                resetAllData();
-              }
-            }}
-            className="px-3.5 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5"
-            title="Reset to initial state"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Data</span>
-          </button>
-          <button
-            onClick={logoutAdmin}
-            className="p-2 text-slate-400 hover:text-slate-800 hover:bg-amber-100/60 rounded-xl transition-colors"
-            title="Exit Admin Mode"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+    <Section title="Event control">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-lg font-black text-slate-900">{PHASE_LABELS[s.phase]}</span>
+        {timer && <Countdown endsAt={timer.endsAt} now={now} label="ends in" urgentBelow={60_000} />}
       </div>
-
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Challenges</span>
-          <span className="text-2xl font-black text-slate-900">{challenges.length}</span>
-          <span className="text-xs text-emerald-600 font-medium block mt-0.5">
-            {challenges.filter((c) => c.isReleased).length} Live
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Active Squads</span>
-          <span className="text-2xl font-black text-slate-900">{teams.length}</span>
-          <span className="text-xs text-slate-500 font-medium block mt-0.5">
-            {teams.reduce((acc, t) => acc + (t.members?.length || 0), 0)} participants
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Submissions</span>
-          <span className="text-2xl font-black text-slate-900">{submissions.length}</span>
-          <span className="text-xs text-slate-500 font-medium block mt-0.5">
-            {submissions.filter((s) => s.status === 'ACCEPTED').length} accepted
-          </span>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Event Status</span>
-          <span className="text-2xl font-black text-emerald-600">LIVE</span>
-          <span className="text-xs text-emerald-700 font-medium block mt-0.5">
-            Arena Accepting Submissions
-          </span>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {PHASE_ACTIONS[s.phase].map((a) => (
+          <button
+            key={a.phase}
+            type="button"
+            className={a.danger ? DANGER : a.secondary ? SECONDARY : PRIMARY}
+            onClick={() => window.confirm(a.confirm) && run('/admin/phase', { phase: a.phase })}
+          >
+            {a.label}
+          </button>
+        ))}
+        {timer && (
+          <>
+            <button type="button" className={SECONDARY} onClick={() => run('/admin/extend', { seconds: 30 })}>
+              +30 s
+            </button>
+            <button type="button" className={SECONDARY} onClick={() => run('/admin/extend', { seconds: 60 })}>
+              +1 min
+            </button>
+            <button type="button" className={SECONDARY} onClick={() => run('/admin/extend', { seconds: -60 })}>
+              −1 min
+            </button>
+          </>
+        )}
       </div>
-
-      {/* Add New Challenge Form */}
-      {isAddingChallenge && (
-        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm space-y-4 animate-fade-in text-left">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 className="font-extrabold text-slate-900 text-lg flex items-center space-x-2">
-              <Plus className="w-5 h-5 text-slate-900" />
-              <span>Create New Challenge</span>
-            </h3>
-            <span className="text-xs text-slate-400 font-medium">Instant Live Release</span>
-          </div>
-
-          <form onSubmit={handleCreateChallenge} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Challenge Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newChallForm.title}
-                  onChange={(e) => handleFormChange('title', e.target.value)}
-                  placeholder="e.g. Entropy Breakdown"
-                  className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Category *
-                </label>
-                <select
-                  value={newChallForm.category}
-                  onChange={(e) => handleFormChange('category', e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Difficulty Level *
-                </label>
-                <select
-                  value={newChallForm.difficulty}
-                  onChange={(e) => handleFormChange('difficulty', e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden"
-                >
-                  <option value="Welcome">🟢 Welcome (50 pts)</option>
-                  <option value="Beginner">🔵 Beginner (100 pts)</option>
-                  <option value="Intermediate">🟡 Intermediate (200 pts)</option>
-                  <option value="Advanced">🔴 Advanced (350+ pts)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Points *
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={newChallForm.points}
-                  onChange={(e) => handleFormChange('points', e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Decoded Key *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newChallForm.acceptedKey}
-                  onChange={(e) => handleFormChange('acceptedKey', e.target.value)}
-                  placeholder="e.g. DTD{solution} or token"
-                  className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Author Signature
-                </label>
-                <input
-                  type="text"
-                  value={newChallForm.author}
-                  onChange={(e) => handleFormChange('author', e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Description & Instructions
-              </label>
-              <textarea
-                rows={3}
-                value={newChallForm.description}
-                onChange={(e) => handleFormChange('description', e.target.value)}
-                placeholder="Describe the problem and context..."
-                className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-slate-900 outline-hidden"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setIsAddingChallenge(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold"
-              >
-                Publish Challenge
-              </button>
-            </div>
-          </form>
+      <p className="text-xs text-slate-500">
+        Timed phases close by themselves: Round 1 after 30 min, buying after 4 min (solving then starts), solving after 25 min.
+      </p>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-xs font-bold text-slate-600">Recovery: jump to any phase</summary>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <select value={manual} onChange={(e) => setManual(e.target.value)} className={INPUT}>
+            {Object.keys(PHASE_LABELS).map((p) => (
+              <option key={p} value={p}>
+                {PHASE_LABELS[p]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={SECONDARY}
+            onClick={() =>
+              window.confirm(`Switch to "${PHASE_LABELS[manual]}"? Timed phases restart their full timer.`) &&
+              run('/admin/phase', { phase: manual })
+            }
+          >
+            Set phase
+          </button>
         </div>
-      )}
+      </details>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={s.lateRegistration} onChange={(e) => run('/admin/late-registration', { enabled: e.target.checked })} />
+        Allow new teams to register after registration closes
+      </label>
+    </Section>
+  );
+};
 
-      {/* Live Challenge Release Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-4 text-left">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="font-extrabold text-slate-900 text-lg">
-              Live Challenge Release Controls
-            </h2>
-            <p className="text-xs text-slate-500">
-              Toggle challenges between Released (Live) and Locked (Coming Soon) in real-time.
-            </p>
-          </div>
-        </div>
+const Prices = ({ s, run }) => {
+  const locked = !['registration', 'practice', 'round1', 'round1_closed'].includes(s.phase);
+  return (
+    <Section title="Round 2 prices">
+      <p className="text-xs text-slate-500">
+        If the pilot shows Hard is far too hard, lower its cost to 35. Prices lock when the market opens.
+      </p>
+      <div className="flex flex-wrap gap-4">
+        {Object.entries(s.config.r2.levels).map(([level, l]) => (
+          <label key={level} className="text-sm flex items-center gap-2 capitalize">
+            {level}
+            <input
+              type="number"
+              min="1"
+              disabled={locked}
+              defaultValue={l.cost}
+              onBlur={(e) => Number(e.target.value) !== l.cost && run('/admin/r2-cost', { level, cost: Number(e.target.value) })}
+              className={`${INPUT} w-20`}
+            />
+            <span className="text-xs text-slate-500 normal-case">coins → {l.points} pts, max {l.max}</span>
+          </label>
+        ))}
+      </div>
+    </Section>
+  );
+};
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="p-3">Status</th>
-                <th className="p-3">Challenge Name</th>
-                <th className="p-3">Track</th>
-                <th className="p-3">Difficulty</th>
-                <th className="p-3">Points</th>
-                <th className="p-3">Solves</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {challenges.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-3">
-                    {c.isReleased ? (
-                      <span className="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold text-[11px]">
-                        <Unlock className="w-3 h-3 text-emerald-600" />
-                        <span>Live</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center space-x-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[11px]">
-                        <Lock className="w-3 h-3 text-amber-600" />
-                        <span>Locked</span>
-                      </span>
-                    )}
+// ---------- teams & scores ----------
+
+const Teams = ({ s, run }) => {
+  const rows = s.standings.qualification;
+  const teamById = Object.fromEntries(s.teams.map((t) => [t.id, t]));
+  return (
+    <Section title={`Teams (${s.teams.length})`}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase tracking-wider text-slate-500">
+            <tr>
+              <th className="py-2 pr-3 text-left">#</th>
+              <th className="py-2 pr-3 text-left">Team</th>
+              <th className="py-2 pr-3 text-left">Members (signed in)</th>
+              <th className="py-2 pr-3 text-right">R1</th>
+              <th className="py-2 pr-3 text-right">R1 time</th>
+              <th className="py-2 pr-3 text-right">R2</th>
+              <th className="py-2 pr-3 text-right">Coins</th>
+              <th className="py-2 pr-3 text-right">Total</th>
+              <th className="py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const t = teamById[r.teamId];
+              return (
+                <tr key={r.teamId} className="border-t border-slate-100">
+                  <td className="py-2 pr-3 font-mono">{r.rank}</td>
+                  <td className="py-2 pr-3 font-semibold">
+                    {r.name}
+                    {r.tied && <span className="ml-2 text-[10px] font-bold uppercase text-amber-700">tied</span>}
                   </td>
-
-                  <td className="p-3 font-bold text-slate-900">{c.title}</td>
-
-                  <td className="p-3 font-mono text-slate-600">{c.category}</td>
-
-                  <td className="p-3">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
-                      {c.difficulty}
-                    </span>
+                  <td className="py-2 pr-3 text-xs">
+                    {t.members.map((m) => (
+                      <span key={m} className={`mr-2 ${t.online.includes(m) ? 'text-emerald-700 font-semibold' : 'text-slate-400'}`}>
+                        {m}
+                      </span>
+                    ))}
                   </td>
-
-                  <td className="p-3 font-mono font-bold text-slate-900">{c.points}</td>
-
-                  <td className="p-3 text-slate-500 font-medium">{c.solvesCount} solves</td>
-
-                  <td className="p-3 text-right space-x-2">
+                  <td className="py-2 pr-3 text-right font-mono">{r.r1.points}</td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs">{formatSeconds(r.r1.timeMs)}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{r.r2.points}</td>
+                  <td className="py-2 pr-3 text-right font-mono">{r.r2.coinsSpent}</td>
+                  <td className="py-2 pr-3 text-right font-mono font-black">{r.total}</td>
+                  <td className="py-2 text-right">
                     <button
-                      onClick={() => toggleChallengeRelease(c.id)}
-                      className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors ${
-                        c.isReleased
-                          ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      }`}
+                      type="button"
+                      className="text-xs text-rose-600 hover:underline"
+                      onClick={() =>
+                        window.confirm(`Remove ${r.name}? Their sessions end and they disappear from the standings.`) &&
+                        run('/admin/team/remove', { teamId: r.teamId })
+                      }
                     >
-                      {c.isReleased ? 'Lock' : 'Release Now'}
-                    </button>
-                    <button
-                      onClick={() => deleteChallenge(c.id)}
-                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                      title="Delete Challenge"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                      Remove
                     </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+    </Section>
+  );
+};
+
+const Corrections = ({ s, run }) => {
+  const [form, setForm] = useState({ round: 'r1', teamId: '', delta: '', reason: '' });
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const submit = async (e) => {
+    e.preventDefault();
+    if (await run('/admin/adjust', { ...form, delta: Number(form.delta) })) setForm((f) => ({ ...f, delta: '', reason: '' }));
+  };
+  return (
+    <Section title="Score corrections (Rounds 1 and 2)">
+      <form onSubmit={submit} className="flex flex-wrap gap-2 items-end">
+        <select value={form.round} onChange={set('round')} className={INPUT} aria-label="Round">
+          <option value="r1">Round 1</option>
+          <option value="r2">Round 2</option>
+        </select>
+        <select value={form.teamId} onChange={set('teamId')} className={INPUT} aria-label="Team" required>
+          <option value="">Team…</option>
+          {s.teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <input type="number" value={form.delta} onChange={set('delta')} placeholder="±points" className={`${INPUT} w-28`} aria-label="Point change" required />
+        <input value={form.reason} onChange={set('reason')} placeholder="Reason (required, kept in the log)" className={`${INPUT} flex-1 min-w-48`} aria-label="Reason" required />
+        <button type="submit" className={PRIMARY}>
+          Log correction
+        </button>
+      </form>
+      {s.adjustments.length > 0 && (
+        <ul className="text-xs space-y-1">
+          {[...s.adjustments].reverse().map((a) => (
+            <li key={a.id} className="text-slate-600">
+              <span className="font-mono">{new Date(a.at).toLocaleTimeString()}</span> · {a.round.toUpperCase()} ·{' '}
+              <strong>{a.teamName ?? 'removed team'}</strong> {a.delta > 0 ? `+${a.delta}` : a.delta} — {a.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+};
+
+const tieGroups = (rows, key) => {
+  const groups = [];
+  rows.forEach((r) => {
+    if (!r.tied) return;
+    const last = groups.at(-1);
+    if (last && key(last[0]) === key(r) && last.at(-1).rank === r.rank - 1) last.push(r);
+    else groups.push([r]);
+  });
+  return groups;
+};
+
+const TieBreaks = ({ s, run }) => {
+  const scopes = [
+    { scope: 'qualification', title: 'Qualification', rows: s.standings.qualification, key: (r) => r.total, show: (r) => `${r.total} pts` },
+    { scope: 'final', title: 'Final', rows: s.standings.final, key: (r) => r.score, show: (r) => `${r.score} pts` }
+  ];
+  return (
+    <Section title="Sudden-death tie-breaks">
+      <p className="text-xs text-slate-500">
+        These teams are still level after every automatic tie-break. Play a sudden-death question, then mark winners in
+        finishing order. Marked teams rank ahead of unmarked tied teams.
+      </p>
+      {scopes.map(({ scope, title, rows, key, show }) => {
+        const groups = tieGroups(rows, key);
+        const marked = s.suddenDeath[scope];
+        return (
+          <div key={scope} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold">{title}</h3>
+              {Object.keys(marked).length > 0 && (
+                <button type="button" className="text-xs text-slate-500 hover:underline" onClick={() => run('/admin/sudden-death', { scope, clear: true })}>
+                  Clear marks
+                </button>
+              )}
+            </div>
+            {groups.length === 0 ? (
+              <p className="text-xs text-slate-400">No unresolved ties.</p>
+            ) : (
+              groups.map((g) => (
+                <div key={g[0].teamId} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-xs text-slate-500">Ranks {g[0].rank}–{g.at(-1).rank} · {show(g[0])}:</span>
+                  {g.map((r) => (
+                    <button
+                      key={r.teamId}
+                      type="button"
+                      disabled={r.teamId in marked}
+                      className={SECONDARY}
+                      onClick={() => run('/admin/sudden-death', { scope, teamId: r.teamId })}
+                    >
+                      {r.teamId in marked ? `${r.name} ✓` : `${r.name} won`}
+                    </button>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        );
+      })}
+    </Section>
+  );
+};
+
+// ---------- final ----------
+
+const Finalists = ({ s, run }) => {
+  const cut = s.config.r3.finalists;
+  const locked = s.finalists.length > 0;
+  const started = s.r3.log.length > 0;
+  const [picked, setPicked] = useState(() => new Set(s.finalists));
+  const toggle = (id) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return (
+    <Section title="Finalists">
+      <p className="text-xs text-slate-500">
+        “Lock top {cut}” takes the first {cut} rows of the qualification table. Resolve ties at the cut first. To override, tick teams and lock the selection.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={PRIMARY}
+          disabled={started}
+          onClick={() => window.confirm(`Lock the top ${cut} teams as finalists?`) && run('/admin/finalists', {})}
+        >
+          Lock top {cut}
+        </button>
+        <button type="button" className={SECONDARY} disabled={started || picked.size === 0} onClick={() => run('/admin/finalists', { teamIds: [...picked] })}>
+          Lock ticked teams ({picked.size})
+        </button>
+      </div>
+      <ul className="grid sm:grid-cols-2 gap-1 text-sm">
+        {s.standings.qualification.map((r) => (
+          <li key={r.teamId} className="flex items-center gap-2">
+            <input type="checkbox" id={`fin-${r.teamId}`} checked={picked.has(r.teamId)} disabled={started} onChange={() => toggle(r.teamId)} />
+            <label htmlFor={`fin-${r.teamId}`} className={r.rank <= cut ? 'font-semibold' : 'text-slate-500'}>
+              {r.rank}. {r.name} ({r.total})
+            </label>
+            {s.finalists.includes(r.teamId) && <span className="text-[10px] font-bold uppercase text-emerald-700">finalist</span>}
+          </li>
+        ))}
+      </ul>
+      {locked && <p className="text-xs text-emerald-700">{s.finalists.length} finalists locked.</p>}
+    </Section>
+  );
+};
+
+const FinalConsole = ({ s, now, run }) => {
+  const cur = s.r3.current;
+  const curQ = cur && s.questions.round3.find((q) => q.id === cur.questionId);
+  const used = new Set([...s.r3.history.map((h) => h.questionId), cur?.questionId]);
+  const unused = s.questions.round3.filter((q) => !used.has(q.id));
+  const next = unused.find((q) => !q.reserve && !q.practice) ?? unused.find((q) => q.reserve);
+  const nextPractice = unused.find((q) => q.practice);
+  const [adj, setAdj] = useState({ teamId: '', delta: '', reason: '' });
+  const canShow = !cur || ['done', 'void'].includes(cur.status);
+  const live = s.phase === 'round3';
+  const correctAnswer = curQ && (curQ.type === 'mcq' ? `${String.fromCharCode(65 + curQ.answer)}. ${curQ.options[curQ.answer]}` : curQ.answer);
+
+  return (
+    <div className="space-y-4">
+      {!live && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">Teams can only buzz once the phase is “Round 3”.</p>}
+      <Section title="Host & judge console">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={PRIMARY} disabled={!canShow || !next} onClick={() => run('/admin/r3/show', { questionId: next.id })}>
+            Show next question{next?.reserve ? ' (reserve)' : ''}
+          </button>
+          {s.r3.log.length === 0 && (
+            <button type="button" className={SECONDARY} disabled={!canShow || !nextPractice} onClick={() => run('/admin/r3/show', { questionId: nextPractice.id })}>
+              Show practice question (no points)
+            </button>
+          )}
+          <button type="button" className={PRIMARY} disabled={cur?.status !== 'shown'} onClick={() => run('/admin/r3/open', {})}>
+            Buzzers open
+          </button>
+          <button type="button" className={PRIMARY} disabled={cur?.status !== 'open'} onClick={() => run('/admin/r3/call', {})}>
+            Name next team ({s.config.r3.answerSec} s)
+          </button>
+          <button type="button" className={SECONDARY} disabled={!cur || !['shown', 'open'].includes(cur.status)} onClick={() => run('/admin/r3/close', {})}>
+            Close question (no one / move on)
+          </button>
+          <button
+            type="button"
+            className={DANGER}
+            disabled={!cur || cur.status === 'void'}
+            onClick={() => {
+              const reason = window.prompt('Why is this question void? (e.g. buzzer order unreliable)');
+              if (reason !== null) run('/admin/r3/void', { reason });
+            }}
+          >
+            Void question
+          </button>
+        </div>
+
+        {cur?.status === 'answering' && (
+          <div className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="font-black text-sky-900 text-lg">{cur.answering && s.teams.find((t) => t.id === cur.answering.teamId)?.name} is answering</p>
+              <Countdown endsAt={cur.answering.endsAt} now={now} size="lg" urgentBelow={3000} />
+            </div>
+            <p className="text-sm">
+              Answer key: <strong className="font-mono">{correctAnswer}</strong>
+            </p>
+            <div className="flex gap-2">
+              <button type="button" className={`${BTN} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={() => run('/admin/r3/judge', { result: 'correct' })}>
+                Correct (+{s.config.r3.correct})
+              </button>
+              <button type="button" className={DANGER} onClick={() => run('/admin/r3/judge', { result: 'wrong' })}>
+                Wrong ({s.config.r3.wrong})
+              </button>
+              <button type="button" className={DANGER} onClick={() => run('/admin/r3/judge', { result: 'timeout' })}>
+                Timeout ({s.config.r3.wrong})
+              </button>
+            </div>
+          </div>
+        )}
+        {curQ && cur.status !== 'answering' && (
+          <p className="text-sm text-slate-600">
+            Answer key: <strong className="font-mono">{correctAnswer}</strong>
+            {cur.status === 'open' && cur.attempts.length > 0 && ' · rebound available'}
+          </p>
+        )}
+      </Section>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <FinalQuestion round3={s.round3} now={now} />
+        </div>
+        <FinalBoard rows={s.standings.final} />
+      </div>
+
+      <Section title="Final score log">
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (await run('/admin/r3/adjust', { ...adj, delta: Number(adj.delta) })) setAdj({ teamId: '', delta: '', reason: '' });
+          }}
+          className="flex flex-wrap gap-2"
+        >
+          <select value={adj.teamId} onChange={(e) => setAdj({ ...adj, teamId: e.target.value })} className={INPUT} required aria-label="Team">
+            <option value="">Finalist…</option>
+            {s.finalists.map((id) => (
+              <option key={id} value={id}>
+                {s.teams.find((t) => t.id === id)?.name}
+              </option>
+            ))}
+          </select>
+          <input type="number" value={adj.delta} onChange={(e) => setAdj({ ...adj, delta: e.target.value })} placeholder="±points" className={`${INPUT} w-28`} required aria-label="Point change" />
+          <input value={adj.reason} onChange={(e) => setAdj({ ...adj, reason: e.target.value })} placeholder="Reason (e.g. dispute upheld)" className={`${INPUT} flex-1 min-w-48`} required aria-label="Reason" />
+          <button type="submit" className={PRIMARY}>
+            Log correction
+          </button>
+        </form>
+        <ul className="text-xs space-y-1">
+          {[...s.r3.log].reverse().map((l, i) => (
+            <li key={i} className="text-slate-600">
+              <span className="font-mono">{new Date(l.at).toLocaleTimeString()}</span> · <strong>{l.teamName}</strong>{' '}
+              <span className={l.delta < 0 ? 'text-rose-600' : 'text-emerald-700'}>{l.delta > 0 ? `+${l.delta}` : l.delta}</span> — {l.reason}
+            </li>
+          ))}
+        </ul>
+      </Section>
     </div>
   );
+};
+
+// ---------- question review ----------
+
+const QuestionBank = ({ s }) => {
+  const show = (q) => (q.type === 'mcq' ? `${String.fromCharCode(65 + q.answer)}. ${q.options[q.answer]}` : `${q.answer}${q.tolerance ? ` (±${q.tolerance})` : ''}`);
+  return (
+    <Section title="Question bank (answers visible to organisers only)">
+      <p className="text-xs text-slate-500">Loaded from {s.questionFile}. Edit that file and restart the server to change questions.</p>
+      {['practice', 'round1', 'round2', 'round3'].filter((round) => s.questions[round]).map((round) => (
+        <details key={round} className="text-sm">
+          <summary className="cursor-pointer font-bold">
+            {round === 'practice' ? 'Practice round' : round.replace('round', 'Round ')} ({s.questions[round].length})
+          </summary>
+          <ol className="mt-2 space-y-2">
+            {s.questions[round].map((q, i) => (
+              <li key={q.id} className="border-t border-slate-100 pt-2">
+                <p className="text-xs text-slate-500">
+                  {i + 1}. {q.id} {q.level && `· ${q.level}`} {q.domain && `· ${q.domain}`} {q.reserve && '· reserve'} {q.practice && '· practice'}
+                </p>
+                <p>{q.prompt}</p>
+                {q.code && <pre className="bg-slate-900 text-slate-100 rounded-lg p-2 text-xs overflow-x-auto">{q.code}</pre>}
+                <p className="text-xs">
+                  Answer: <strong className="font-mono">{show(q)}</strong>
+                </p>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ))}
+    </Section>
+  );
+};
+
+// ---------- page ----------
+
+const TABS = [
+  { id: 'control', label: 'Event control' },
+  { id: 'teams', label: 'Teams & scores' },
+  { id: 'final', label: 'Final' },
+  { id: 'questions', label: 'Questions' }
+];
+
+const Console = ({ onSignOut }) => {
+  const { data: s, error, offset, refresh } = usePolledState('/admin/state', { admin: true, interval: 1000 });
+  const now = useServerNow(offset, 250);
+  const [tab, setTab] = useState('control');
+  const [actionError, setActionError] = useState(null);
+
+  // Returns true on success so forms can reset themselves.
+  const run = async (path, body) => {
+    setActionError(null);
+    try {
+      await api(path, { body, admin: true });
+      await refresh();
+      return true;
+    } catch (err) {
+      setActionError(err.message);
+      return false;
+    }
+  };
+
+  const signedOut = error?.status === 401;
+  useEffect(() => {
+    if (signedOut) {
+      adminToken.set(null);
+      onSignOut();
+    }
+  }, [signedOut, onSignOut]);
+
+  if (!s) return <div className="min-h-screen flex items-center justify-center text-slate-500">{error?.message ?? 'Loading…'}</div>;
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-left">
+            <p className="font-black text-slate-900">DTD Battleground · Organisers</p>
+            <p className="text-xs text-slate-500">{PHASE_LABELS[s.phase]} · {s.teams.length} teams</p>
+          </div>
+          <nav className="flex flex-wrap gap-1" aria-label="Console sections">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                aria-current={tab === t.id ? 'page' : undefined}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${tab === t.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <div className="flex flex-wrap gap-2">
+            <a href="#/display" target="_blank" rel="noreferrer" className={`${SECONDARY} inline-flex items-center gap-1`}>
+              <Monitor className="w-3.5 h-3.5" aria-hidden /> Projector
+            </a>
+            <button type="button" className={`${SECONDARY} inline-flex items-center gap-1`} onClick={() => downloadAdminFile('/admin/standings.csv', 'dtd-standings.csv').catch((e) => setActionError(e.message))}>
+              <Download className="w-3.5 h-3.5" aria-hidden /> Score sheet
+            </button>
+            <button type="button" className={`${SECONDARY} inline-flex items-center gap-1`} onClick={() => downloadAdminFile('/admin/backup', 'dtd-backup.json').catch((e) => setActionError(e.message))}>
+              <Download className="w-3.5 h-3.5" aria-hidden /> Backup
+            </button>
+            <button
+              type="button"
+              className={`${SECONDARY} inline-flex items-center gap-1`}
+              onClick={async () => {
+                await api('/admin/logout', { body: {}, admin: true }).catch(() => {});
+                adminToken.set(null);
+                onSignOut();
+              }}
+            >
+              <LogOut className="w-3.5 h-3.5" aria-hidden /> Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        {s.isSampleQuestions && (
+          <p className="flex items-center gap-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-left">
+            <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden /> Running on SAMPLE questions. Put the reviewed bank in server/questions.json before the event.
+          </p>
+        )}
+        {s.questionWarnings.map((w) => (
+          <p key={w} className="text-xs text-amber-800 text-left">
+            Question bank: {w}
+          </p>
+        ))}
+        <ErrorNote>{actionError || (error && `${error.message} Retrying…`)}</ErrorNote>
+
+        {tab === 'control' && (
+          <>
+            <EventControl key={s.phase} s={s} now={now} run={run} />
+            <Prices s={s} run={run} />
+            <Section title="Danger zone">
+              <button
+                type="button"
+                className={DANGER}
+                onClick={() => {
+                  const typed = window.prompt('This deletes every team, answer and score. Download a backup first. Type RESET to continue.');
+                  if (typed !== null) run('/admin/reset', { confirm: typed });
+                }}
+              >
+                Reset event
+              </button>
+            </Section>
+          </>
+        )}
+        {tab === 'teams' && (
+          <>
+            <Teams s={s} run={run} />
+            <Corrections s={s} run={run} />
+            <TieBreaks s={s} run={run} />
+          </>
+        )}
+        {tab === 'final' && (
+          <>
+            <Finalists key={s.finalists.join()} s={s} run={run} />
+            {s.finalists.length > 0 && <FinalConsole s={s} now={now} run={run} />}
+          </>
+        )}
+        {tab === 'questions' && <QuestionBank s={s} />}
+      </main>
+    </div>
+  );
+};
+
+export const AdminDashboard = () => {
+  const [signedIn, setSignedIn] = useState(() => Boolean(adminToken.get()));
+  return signedIn ? <Console onSignOut={() => setSignedIn(false)} /> : <Login onDone={() => setSignedIn(true)} />;
 };

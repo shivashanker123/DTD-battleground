@@ -1,323 +1,176 @@
 import React from 'react';
-import {
-  Users,
-  ArrowRight,
-  ShieldCheck,
-  Clock,
-  Check
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Zap, Coins, Bell, ShieldCheck } from 'lucide-react';
+import { useEvent } from '../context/EventContext';
+import { InstagramIcon } from '../components/Icons';
+import { Card } from '../components/ui';
+import { AuthPanel } from './AuthPage';
 
-export const LandingPage = ({ onEnterArena, onOpenAuth, onNavigateTab }) => {
-  const { teams } = useAuth();
-  const { challenges } = useCTF();
+const SCHEDULE = [
+  ['00:00–00:20', 'Check-in, seating, logins'],
+  ['00:20–00:30', 'Rules briefing and practice'],
+  ['00:30–01:00', 'Round 1: Puzzle Sprint'],
+  ['01:00–01:05', 'Break, score check, Risk Market briefing'],
+  ['01:05–01:09', 'Round 2 buying'],
+  ['01:09–01:34', 'Round 2 solving'],
+  ['01:34–01:44', 'Score check, finalists announced, buzzer practice'],
+  ['01:44–02:14', 'Round 3: Buzzer Final'],
+  ['02:14–02:20', 'Results and prizes']
+];
 
-  const topTeams = [...teams].sort((a, b) => b.score - a.score).slice(0, 5);
+const Section = ({ title, children }) => (
+  <section className="space-y-3 text-left">
+    <h2 className="text-xl font-black text-slate-900">{title}</h2>
+    {children}
+  </section>
+);
+
+// Compact sign-in screen for visitors; the full rules live in the Rules tab after sign-in.
+export const EntryPage = () => (
+  <div className="max-w-md mx-auto px-4 py-12 sm:py-16 space-y-6">
+    <div className="text-center space-y-1">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">JNTUH Data Science Club</p>
+      <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">DTD Battleground</h1>
+      <p className="text-sm text-slate-600">A three-round team quiz: Puzzle Sprint, Risk Market, Buzzer Final.</p>
+    </div>
+    <AuthPanel />
+  </div>
+);
+
+// Event overview and rules, shown as the Rules tab to signed-in teams.
+export const LandingPage = () => {
+  const { state } = useEvent();
+  const cfg = state?.config;
+  if (!cfg) return null;
+  const { r1, r2, r3 } = cfg;
 
   return (
-    <div className="space-y-16 py-8 sm:py-12 animate-fade-in">
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-        <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-          <span>DATA SCIENCE CLUB • ANNUAL FLAGSHIP EVENT 2026</span>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+      <div className="space-y-5 text-left">
+        <div className="space-y-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">JNTUH Data Science Club presents</p>
+          <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-tight">DTD Battleground</h1>
+          <div className="inline-block bg-slate-900 text-white font-extrabold text-lg px-4 py-2 rounded-xl tracking-wide">
+            Decode The Data
+          </div>
         </div>
-
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-slate-900 tracking-tight leading-none">
-          DTD <span className="text-indigo-600">— Decode The Data</span>
-        </h1>
-
-        <p className="text-xl sm:text-2xl font-bold text-slate-700 max-w-3xl mx-auto tracking-tight">
-          A CTF-Style Data Science Competition
+        <p className="text-base sm:text-lg text-slate-600 max-w-xl leading-relaxed">
+          A three-round team quiz for teams of {cfg.maxTeamSize}. Rounds 1 and 2 are qualifiers. The top {r3.finalists} teams
+          play a buzzer final that starts from zero. About 2½ hours from check-in to prizes.
         </p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <Card className="p-4">
+            <Zap className="w-5 h-5 text-sky-600" aria-hidden />
+            <p className="font-bold text-slate-900 mt-2">Puzzle Sprint</p>
+            <p className="text-xs text-slate-600">{state.counts.round1} questions, {r1.questionSec} s each, +{r1.points} per correct answer</p>
+          </Card>
+          <Card className="p-4">
+            <Coins className="w-5 h-5 text-amber-500" aria-hidden />
+            <p className="font-bold text-slate-900 mt-2">Risk Market</p>
+            <p className="text-xs text-slate-600">{r2.startCoins} coins to buy blind questions worth {r2.levels.easy.points} / {r2.levels.medium.points} / {r2.levels.hard.points}</p>
+          </Card>
+          <Card className="p-4">
+            <Bell className="w-5 h-5 text-rose-600" aria-hidden />
+            <p className="font-bold text-slate-900 mt-2">Buzzer Final</p>
+            <p className="text-xs text-slate-600">Top {r3.finalists} teams, scores reset, +{r3.correct} correct, {r3.wrong} wrong</p>
+          </Card>
+        </div>
+      </div>
 
-        <p className="text-sm sm:text-base text-slate-500 max-w-2xl mx-auto leading-relaxed">
-          Forget traditional cybersecurity flags. Step into real-world datasets, hunt subtle statistical anomalies,
-          reverse-engineer machine learning weights, and decode secret analytical tokens to dominate the leaderboard.
+      <Section title="Round 1: Puzzle Sprint">
+        <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+          <li>{Math.round(r1.durationSec / 60)} minutes. Every team gets the same {state.counts.round1} questions, shown as tiles Q1–Q{state.counts.round1}. Answer them in any order.</li>
+          <li>A question’s text stays hidden until your team opens it. Opening starts a {r1.questionSec}-second timer that keeps running if you refresh.</li>
+          <li>Your team can have one question open at a time, and gets one answer per question. Answers cannot be changed.</li>
+          <li>Correct = {r1.points} points. Wrong or out of time = 0. Answers are multiple choice or a number.</li>
+          <li>Ties go to the team with less total time (from opening to submitting) across its correct answers.</li>
+          <li>Topics: logic and patterns, Python output, intro data science and AI, data interpretation, aptitude. They start easy and get harder.</li>
+        </ul>
+      </Section>
+
+      <Section title="Round 2: Risk Market">
+        <p className="text-sm text-slate-700">
+          Each team gets {r2.startCoins} coins to buy questions it cannot see yet. You only see each question’s domain and difficulty.
+          You have {Math.round(r2.buySec / 60)} minutes to buy, then {Math.round(r2.solveSec / 60)} minutes to solve.
         </p>
+        <Card className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-4 py-2">Level</th>
+                <th className="px-4 py-2 text-right">Cost (coins)</th>
+                <th className="px-4 py-2 text-right">Points if correct</th>
+                <th className="px-4 py-2 text-right">Max per team</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(r2.levels).map(([name, l]) => (
+                <tr key={name} className="border-t border-slate-100">
+                  <td className="px-4 py-2 font-semibold capitalize">{name}</td>
+                  <td className="px-4 py-2 text-right font-mono">{l.cost}</td>
+                  <td className="px-4 py-2 text-right font-mono">{l.points}</td>
+                  <td className="px-4 py-2 text-right font-mono">{l.max}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+        <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+          <li>A wrong answer scores 0 and coins are not refunded. Leftover coins are worth nothing.</li>
+          <li>You can return a question while buying is still open.</li>
+          <li>Equal scores are broken by: whose last correct answer was submitted earlier, then fewer coins spent, then a sudden-death question.</li>
+        </ul>
+      </Section>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-          <button
-            onClick={onEnterArena}
-            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl text-sm sm:text-base transition-all shadow-md shadow-indigo-100 flex items-center space-x-2"
-          >
-            <span>Enter Challenge Arena</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onOpenAuth}
-            className="px-6 py-3.5 bg-white hover:bg-slate-50 text-slate-800 font-extrabold border border-slate-300 rounded-xl text-sm sm:text-base transition-all shadow-2xs flex items-center space-x-2"
-          >
-            <Users className="w-4 h-4 text-indigo-600" />
-            <span>Form / Join a Team</span>
-          </button>
-        </div>
+      <Section title="Round 3: Buzzer Final">
+        <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+          <li>The top {r3.finalists} teams after Rounds 1 and 2 qualify and all start at 0. The final alone decides the winner.</li>
+          <li>15 live questions, about 30 minutes. The host shows and reads each one, then says “Buzzers open”. Buzzing before that does nothing.</li>
+          <li>The first team to buzz answers within {r3.answerSec} seconds after the host names it. Correct +{r3.correct}; wrong or timeout {r3.wrong} (totals can go negative).</li>
+          <li>After a wrong answer or timeout, that team is out for the question and one rebound goes to a different team, with the same scoring.</li>
+          <li>Ties in the final: sudden death between the tied teams. If still tied, the higher qualifier wins.</li>
+          <li>Captains raise disputes before the next question.</li>
+        </ul>
+      </Section>
 
-        {/* Quick Highlights Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto pt-8">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-center shadow-xs">
-            <span className="text-2xl font-black text-indigo-600">6 Tracks</span>
-            <span className="text-xs text-slate-500 block mt-0.5">From EDA to Deep Learning</span>
-          </div>
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-center shadow-xs">
-            <span className="text-2xl font-black text-indigo-600">4 Difficulties</span>
-            <span className="text-xs text-slate-500 block mt-0.5">Welcome to Advanced</span>
-          </div>
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-center shadow-xs">
-            <span className="text-2xl font-black text-indigo-600">Dynamic Score</span>
-            <span className="text-xs text-slate-500 block mt-0.5">Team & Solo Leaderboards</span>
-          </div>
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-center shadow-xs">
-            <span className="text-2xl font-black text-indigo-600">Real Datasets</span>
-            <span className="text-xs text-slate-500 block mt-0.5">CSV, JSON & Neural Weights</span>
-          </div>
-        </div>
-      </section>
-
-      {/* What is DTD & The CTF Experience */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 shadow-xs space-y-8">
-          <div className="max-w-2xl">
-            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Concept & Philosophy</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
-              What is DTD — Decode The Data?
-            </h2>
-            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-              In classical cybersecurity CTFs, players exploit memory or web servers to find text flags like <code className="text-pink-600 bg-pink-50 px-1 py-0.5 rounded">flag&#123;...&#125;</code>.
-              In <strong>DTD</strong>, your target is data science truth.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-                1
-              </div>
-              <h3 className="font-extrabold text-slate-900 text-sm">Download Dataset</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Ingest raw telemetry, dirty registrations, medical trials, or neural weights.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-                2
-              </div>
-              <h3 className="font-extrabold text-slate-900 text-sm">Analyse & Model</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Run statistical checks, identify outlier IQR timestamps, or calculate model metrics.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
-                3
-              </div>
-              <h3 className="font-extrabold text-slate-900 text-sm">Extract Decoded Key</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Format your mathematical findings into verifiable tokens like <code className="text-indigo-600">DTD&#123;KEY&#125;</code>.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-                4
-              </div>
-              <h3 className="font-extrabold text-slate-900 text-sm">Score & Conquer</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Turn challenge boxes green, earn points for your squad, and rank up live!
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Difficulty Tracks Breakdown */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="text-center max-w-2xl mx-auto">
-          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Skill Progression</span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
-            4 Competitive Difficulty Tiers
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Challenges are weighted by complexity, from platform warm-ups to deep neural investigations.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* Welcome */}
-          <div className="bg-white rounded-2xl border-2 border-emerald-200 p-6 shadow-xs space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-black uppercase text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                🟢 Welcome Level
-              </span>
-              <span className="font-mono font-bold text-xs text-slate-400">20–50 pts</span>
-            </div>
-            <h3 className="font-extrabold text-slate-900 text-lg">Platform Warmup</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Verify Data Science Club Instagram handles, test CSV ingestion, and learn token submission flows.
-            </p>
-          </div>
-
-          {/* Beginner */}
-          <div className="bg-white rounded-2xl border-2 border-sky-200 p-6 shadow-xs space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-black uppercase text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full border border-sky-200">
-                🔵 Beginner
-              </span>
-              <span className="font-mono font-bold text-xs text-slate-400">50–150 pts</span>
-            </div>
-            <h3 className="font-extrabold text-slate-900 text-lg">Statistical Basics</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Basic statistics, outlier detection with IQR, simple string deduplication, and confusion matrix math.
-            </p>
-          </div>
-
-          {/* Intermediate */}
-          <div className="bg-white rounded-2xl border-2 border-amber-200 p-6 shadow-xs space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                🟡 Intermediate
-              </span>
-              <span className="font-mono font-bold text-xs text-slate-400">150–300 pts</span>
-            </div>
-            <h3 className="font-extrabold text-slate-900 text-lg">Analytical Depth</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Pearson correlation matrices, median bucket imputation, feature importance in trees, and Word2Vec analogies.
-            </p>
-          </div>
-
-          {/* Advanced */}
-          <div className="bg-white rounded-2xl border-2 border-rose-200 p-6 shadow-xs space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-black uppercase text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
-                🔴 Advanced
-              </span>
-              <span className="font-mono font-bold text-xs text-slate-400">300–500+ pts</span>
-            </div>
-            <h3 className="font-extrabold text-slate-900 text-lg">AI & Deep Forensics</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Simpson’s paradox breakdowns, regression residual steganography, early stopping epochs, and Transformer attention matrices.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Event Schedule & Rules */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Timeline */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-xs space-y-6">
-            <div className="flex items-center space-x-2 text-indigo-600">
-              <Clock className="w-5 h-5" />
-              <h3 className="font-extrabold text-slate-900 text-xl">Event Schedule & Live Release</h3>
-            </div>
-            <div className="space-y-4 border-l-2 border-slate-200 pl-4 text-xs sm:text-sm">
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                <p className="font-bold text-slate-900">10:00 AM — Opening Keynote & Track 1 Live</p>
-                <p className="text-slate-500 text-xs mt-0.5">Welcome & Beginner tracks unlocked for all participants.</p>
-              </div>
-
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                <p className="font-bold text-slate-900">12:00 PM — Midday Drop: Intermediate Challenges</p>
-                <p className="text-slate-500 text-xs mt-0.5">Feature engineering and correlation puzzles unlocked.</p>
-              </div>
-
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-amber-500" />
-                <p className="font-bold text-slate-900">02:00 PM — Advanced AI & Transformer Track</p>
-                <p className="text-slate-500 text-xs mt-0.5">High-point challenges released by admins.</p>
-              </div>
-
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-rose-600" />
-                <p className="font-bold text-slate-900">04:00 PM — Scoreboard Freeze & Final Hour</p>
-                <p className="text-slate-500 text-xs mt-0.5">Leaderboard freezes to build final suspense.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Rules & Integrity */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-xs space-y-6">
-            <div className="flex items-center space-x-2 text-indigo-600">
-              <ShieldCheck className="w-5 h-5" />
-              <h3 className="font-extrabold text-slate-900 text-xl">Rules & Scoring Integrity</h3>
-            </div>
-            <ul className="space-y-3 text-xs sm:text-sm text-slate-600">
-              <li className="flex items-start space-x-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Team Collaboration:</strong> Teams can have 1 to 4 members. Once a member solves a challenge, points are awarded to the entire squad.
-                </span>
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Section title="Schedule">
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm text-left">
+              <tbody>
+                {SCHEDULE.map(([time, what]) => (
+                  <tr key={time} className="border-t first:border-t-0 border-slate-100">
+                    <td className="px-4 py-2 font-mono text-slate-500 whitespace-nowrap">{time}</td>
+                    <td className="px-4 py-2">{what}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </Section>
+        <Section title="Fair play">
+          <ul className="space-y-2 text-sm text-slate-700">
+            {[
+              'Teams sit apart. Phones away during Rounds 1 and 2; volunteers invigilate.',
+              'All answers are multiple choice or numeric, to avoid disputes.',
+              'Score corrections are logged with a reason and never silently overwritten.',
+              'Following our Instagram is an optional perk. It never affects scores or rank.'
+            ].map((rule) => (
+              <li key={rule} className="flex gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+                <span>{rule}</span>
               </li>
-              <li className="flex items-start space-x-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Hint Deductions:</strong> Hints can be unlocked voluntarily. Hint penalties reduce net points for that challenge.
-                </span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Tie-Breaking:</strong> In case of identical scores, teams with earlier last submission timestamps rank higher.
-                </span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Fair Play:</strong> Sharing answer keys across opposing squads leads to disqualification.
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* Leaderboard Sneak-Peek */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-slate-900 text-white rounded-3xl p-8 sm:p-10 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Live Preview</span>
-              <h3 className="text-2xl font-black tracking-tight text-white mt-1">Current Leaderboard Top 5</h3>
-            </div>
-            <button
-              onClick={() => onNavigateTab('scoreboard')}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-colors self-start sm:self-center"
-            >
-              View Full Standings →
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-            {topTeams.map((team, idx) => (
-              <div key={team.id} className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 text-center">
-                <span className="text-xs text-amber-400 font-bold block">#{idx + 1}</span>
-                <p className="font-extrabold text-white text-sm truncate mt-1">{team.name}</p>
-                <p className="text-[11px] text-slate-400 truncate">{team.college}</p>
-                <p className="text-lg font-black text-emerald-400 font-mono mt-2">{team.score} pts</p>
-              </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="max-w-4xl mx-auto px-4 text-center space-y-4 pt-4">
-        <h2 className="text-3xl font-extrabold text-slate-900">Ready to Decode The Data?</h2>
-        <p className="text-sm text-slate-500 max-w-xl mx-auto">
-          Form your squad, authenticate with your team password, and step into the challenge arena.
-        </p>
-        <button
-          onClick={onEnterArena}
-          className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl text-base transition-all shadow-md shadow-indigo-100 inline-flex items-center space-x-2"
-        >
-          <span>Launch Challenge Arena</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </section>
+          </ul>
+          <a
+            href="https://www.instagram.com/datascienceclubjntuh/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-pink-700 hover:underline"
+          >
+            <InstagramIcon className="w-4 h-4" /> @datascienceclubjntuh (optional, non-scoring)
+          </a>
+        </Section>
+      </div>
     </div>
   );
 };
