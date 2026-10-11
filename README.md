@@ -1,23 +1,4 @@
 # DTD Battleground — Decode The Data
-### JNTUH Data Science Club event platform
-
-A three-round team quiz for 20+ teams of 3, running about 2½ hours. Rounds 1 and 2 are qualifiers; the top 8 teams play a buzzer final that starts from zero.
-
-| Stage | Format | Scoring |
-|---|---|---|
-| Round 1: Puzzle Sprint | 30 min, 25 questions, 60 s each | +50 per correct answer |
-| Round 2: Risk Market | 4 min buying, 25 min solving | 200 coins buy Easy / Medium / Hard questions worth 30 / 70 / 110 |
-| Round 3: Buzzer Final | Top 8 teams, 15 live questions | Scores reset; +50 correct, −20 wrong |
-
-## How it works
-
-A small Node server (`server/`, no extra dependencies) owns the timers, who can see what, answer checking and all totals. The React site only displays what the server sends, and answer keys never reach team browsers. State is saved to `server/data/state.json` after every change, so refreshing a page or restarting the server loses nothing.
-
-| URL | Who | What |
-|---|---|---|
-| `/` | Teams | Register or sign in, play the current round, leaderboard, rules |
-| `/#/admin` | Organisers | Phase control and timers, teams, score corrections, tie-breaks, finalists, host/judge console for the final, question review, CSV score sheet and JSON backup |
-| `/#/display` | Projector | Phase, big timer, live standings; in the final, the question, buzz order and scoreboard |
 
 ## Running it
 
