@@ -55,6 +55,25 @@ test('registration, team size cap and one session per member', () => {
   game.registerTeam(state, { teamName: 'Late', passcode: 'abcd', member: 'L' }, T0);
 });
 
+test('async registration and login keep the same auth rules without blocking the HTTP path', async () => {
+  const state = game.createState();
+  const created = await game.registerTeamAsync(state, { teamName: 'Async Team', passcode: 'pass1234', member: 'Lead' }, T0);
+  assert.equal(created.team.name, 'Async Team');
+
+  await assert.rejects(
+    game.registerTeamAsync(state, { teamName: 'async team', passcode: 'pass1234', member: 'Other' }, T0),
+    /taken/
+  );
+  await assert.rejects(
+    game.loginTeamAsync(state, { teamName: 'Async Team', passcode: 'wrong', member: 'Other' }, T0),
+    /incorrect/
+  );
+
+  const joined = await game.loginTeamAsync(state, { teamName: 'Async Team', passcode: 'pass1234', member: 'Other' }, T0);
+  assert.equal(joined.member, 'Other');
+  assert.deepEqual(created.team.members, ['Lead', 'Other']);
+});
+
 test('round 1: one active question, one submission, timer survives and expires', () => {
   const { state, teams } = setup(1);
   const [t] = teams;

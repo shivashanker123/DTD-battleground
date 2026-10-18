@@ -116,8 +116,24 @@ const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
 const hashPasscode = (passcode, salt) => crypto.scryptSync(passcode, salt, 32).toString('hex');
 
+// HTTP requests use this version so a password hash does not block timers, polls or other teams.
+// The synchronous version above stays for the pure game-engine API and its fast unit tests.
+const hashPasscodeAsync = (passcode, salt) =>
+  new Promise((resolve, reject) => {
+    crypto.scrypt(passcode, salt, 32, (err, key) => {
+      if (err) reject(err);
+      else resolve(key.toString('hex'));
+    });
+  });
+
 function checkPasscode(team, passcode) {
   const given = Buffer.from(hashPasscode(passcode, team.salt), 'hex');
+  const stored = Buffer.from(team.hash, 'hex');
+  return given.length === stored.length && crypto.timingSafeEqual(given, stored);
+}
+
+async function checkPasscodeAsync(team, passcode) {
+  const given = Buffer.from(await hashPasscodeAsync(passcode, team.salt), 'hex');
   const stored = Buffer.from(team.hash, 'hex');
   return given.length === stored.length && crypto.timingSafeEqual(given, stored);
 }
@@ -167,10 +183,58 @@ export function registerTeam(state, input, now) {
   return { team, ...startSession(state, team, person, now) };
 }
 
+// Async HTTP path: crypto.scrypt runs in Node's worker pool instead of freezing the event loop.
+// Repeat the checks after awaiting: another request may have changed state while hashing.
+export async function registerTeamAsync(state, input, now) {
+  const { name, person, code } = validateCredentials(input);
+  const registrationOpen = () => ['registration', 'practice'].includes(state.phase) || state.lateRegistration;
+  const nameTaken = () => Object.values(state.teams).some((t) => sameName(t.name, name));
+  if (!registrationOpen()) fail('Team registration is closed. Ask an organiser at the help desk.', 403);
+  if (nameTaken()) fail('That team name is taken. Choose another, or join the team with its passcode.', 409);
+
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = await hashPasscodeAsync(code, salt);
+
+  if (!registrationOpen()) fail('Team registration is closed. Ask an organiser at the help desk.', 403);
+  if (nameTaken()) fail('That team name is taken. Choose another, or join the team with its passcode.', 409);
+  const team = {
+    id: `t_${crypto.randomBytes(6).toString('hex')}`,
+    name,
+    salt,
+    hash,
+    members: [person],
+    createdAt: now
+  };
+  state.teams[team.id] = team;
+  return { team, ...startSession(state, team, person, now) };
+}
+
 export function loginTeam(state, input, now) {
   const { name, person, code } = validateCredentials(input);
   const team = Object.values(state.teams).find((t) => sameName(t.name, name));
   if (!team || !checkPasscode(team, code)) fail('Team name or passcode is incorrect.', 401);
+  let member = team.members.find((m) => sameName(m, person));
+  if (!member) {
+    if (team.members.length >= state.config.maxTeamSize) {
+      fail(
+        `${team.name} already has ${state.config.maxTeamSize} members (${team.members.join(', ')}). Sign in with one of those names.`,
+        409
+      );
+    }
+    member = person;
+    team.members.push(member);
+  }
+  return { team, member, ...startSession(state, team, member, now) };
+}
+
+export async function loginTeamAsync(state, input, now) {
+  const { name, person, code } = validateCredentials(input);
+  let team = Object.values(state.teams).find((t) => sameName(t.name, name));
+  if (!team || !(await checkPasscodeAsync(team, code))) fail('Team name or passcode is incorrect.', 401);
+
+  // An organiser may have removed the team while its passcode was being checked.
+  team = state.teams[team.id];
+  if (!team) fail('Team name or passcode is incorrect.', 401);
   let member = team.members.find((m) => sameName(m, person));
   if (!member) {
     if (team.members.length >= state.config.maxTeamSize) {

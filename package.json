@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --configLoader native",
     "server": "node --watch server/index.js",
-    "build": "vite build",
+    "build": "vite build --configLoader native",
     "start": "node server/index.js",
     "test": "node --test server/game.test.js",
     "lint": "oxlint",

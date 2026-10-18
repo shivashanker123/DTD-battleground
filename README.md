@@ -11,7 +11,7 @@ A three-round team quiz for 20+ teams of 3, running about 2½ hours. Rounds 1 an
 
 ## How it works
 
-A small Node server (`server/`, no extra dependencies) owns the timers, who can see what, answer checking and all totals. The React site only displays what the server sends, and answer keys never reach team browsers. State is saved to `server/data/state.json` after every change, so refreshing a page or restarting the server loses nothing.
+A small Node server (`server/`, no extra dependencies) owns the timers, who can see what, answer checking and all totals. The React site only displays what the server sends, and answer keys never reach team browsers. State is safely persisted to `server/data/state.json` in short serialized batches, so a refresh or normal server restart loses nothing without a registration rush freezing the app.
 
 | URL | Who | What |
 |---|---|---|

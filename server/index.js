@@ -1,5 +1,5 @@
 // DTD Battleground server: owns timers, access, answer checking and totals.
-// State is saved to disk after every change, so a refresh or a server restart loses nothing.
+// State is persisted in short, serialized batches so a registration rush cannot freeze the event loop.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,11 +28,57 @@ function loadState() {
   return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
 }
 
+const SAVE_DEBOUNCE_MS = 250;
+let saveRequested = false;
+let saveTimer = null;
+let saveRunning = null;
+let saveSequence = 0;
+
+// Coalesce a burst of mutations into one latest-state snapshot. Only one writer may run at a
+// time; otherwise an older write could complete after a newer one and overwrite it.
 function saveState() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = `${STATE_FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(state));
-  fs.renameSync(tmp, STATE_FILE); // atomic replace: a crash never leaves a half-written file
+  saveRequested = true;
+  if (saveTimer || saveRunning) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    void flushState();
+  }, SAVE_DEBOUNCE_MS);
+}
+
+async function flushState() {
+  if (saveRunning) return saveRunning;
+  if (!saveRequested) return;
+
+  saveRequested = false;
+  const snapshot = JSON.stringify(state);
+  const tmp = `${STATE_FILE}.${process.pid}.${++saveSequence}.tmp`;
+  saveRunning = (async () => {
+    await fs.promises.mkdir(DATA_DIR, { recursive: true });
+    await fs.promises.writeFile(tmp, snapshot);
+    await fs.promises.rename(tmp, STATE_FILE); // atomic replace: never leaves a partial state file
+  })();
+
+  try {
+    await saveRunning;
+  } catch (err) {
+    // Keep the state dirty so the next mutation retries persistence instead of silently losing it.
+    saveRequested = true;
+    console.error('Could not persist game state:', err);
+  } finally {
+    saveRunning = null;
+    if (saveRequested) saveState();
+  }
+}
+
+async function flushStateBeforeExit() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  while (saveRunning || saveRequested) {
+    if (saveRunning) await saveRunning.catch(() => {});
+    else await flushState();
+  }
 }
 
 let state = loadState();
@@ -232,13 +278,13 @@ const open = (fn) => ({ auth: 'none', fn });
 const routes = {
   'GET /api/state': open(({ session, now }) => publicState(session, now)),
 
-  'POST /api/register': open(({ body, now }) => {
-    const { token } = game.registerTeam(state, body, now);
+  'POST /api/register': open(async ({ body, now }) => {
+    const { token } = await game.registerTeamAsync(state, body, now);
     return { token };
   }),
   'POST /api/login': {
-    ...open(({ body, now }) => {
-      const { token, replaced } = game.loginTeam(state, body, now);
+    ...open(async ({ body, now }) => {
+      const { token, replaced } = await game.loginTeamAsync(state, body, now);
       return { token, replaced };
     }),
     limitKey: (body) => `team:${game.cleanName(body.teamName).toLowerCase()}`
@@ -410,7 +456,8 @@ async function handleApi(req, res, pathname) {
       }
       throw err;
     }
-    // Every successful POST changes the game, so persist it straight away.
+    // Every successful POST changes the game. Persistence is coalesced for 250 ms but flushed
+    // serially, keeping state safe without blocking a registration burst.
     if (req.method === 'POST') saveState();
     if (result.csv !== undefined) {
       res.writeHead(200, {
@@ -471,6 +518,15 @@ const server = http.createServer((req, res) => {
   if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
   return serveStatic(req, res, pathname);
 });
+
+let shuttingDown = false;
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    void flushStateBeforeExit().finally(() => process.exit(0));
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`DTD Battleground server on http://localhost:${PORT} (state: ${STATE_FILE})`);
