@@ -34,9 +34,10 @@ export const DEFAULT_CONFIG = {
 };
 
 export class GameError extends Error {
-  constructor(message, status = 400) {
+  constructor(message, status = 400, headers = {}) {
     super(message);
     this.status = status;
+    this.headers = headers;
   }
 }
 
@@ -116,15 +117,52 @@ const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
 const hashPasscode = (passcode, salt) => crypto.scryptSync(passcode, salt, 32).toString('hex');
 
+const positiveInt = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+// Bound expensive scrypt work. Node's worker pool already limits simultaneous hashing, but this
+// small application-level queue prevents an unbounded registration flood from consuming memory.
+const MAX_HASHES = positiveInt(process.env.HASH_CONCURRENCY, 4);
+const MAX_HASH_WAITERS = positiveInt(process.env.HASH_QUEUE_LIMIT, 32);
+let activeHashes = 0;
+const hashWaiters = [];
+
+function startHashJob(job) {
+  activeHashes += 1;
+  job.work()
+    .then(job.resolve, job.reject)
+    .finally(() => {
+      activeHashes -= 1;
+      const next = hashWaiters.shift();
+      if (next) startHashJob(next);
+    });
+}
+
+function runBoundedHash(work) {
+  return new Promise((resolve, reject) => {
+    const job = { work, resolve, reject };
+    if (activeHashes < MAX_HASHES) return startHashJob(job);
+    if (hashWaiters.length >= MAX_HASH_WAITERS) {
+      return reject(new GameError('Registration is busy. Please wait a moment and try again.', 503, { 'Retry-After': '2' }));
+    }
+    hashWaiters.push(job);
+  });
+}
+
 // HTTP requests use this version so a password hash does not block timers, polls or other teams.
 // The synchronous version above stays for the pure game-engine API and its fast unit tests.
 const hashPasscodeAsync = (passcode, salt) =>
-  new Promise((resolve, reject) => {
-    crypto.scrypt(passcode, salt, 32, (err, key) => {
-      if (err) reject(err);
-      else resolve(key.toString('hex'));
-    });
-  });
+  runBoundedHash(
+    () =>
+      new Promise((resolve, reject) => {
+        crypto.scrypt(passcode, salt, 32, (err, key) => {
+          if (err) reject(err);
+          else resolve(key.toString('hex'));
+        });
+      })
+  );
 
 function checkPasscode(team, passcode) {
   const given = Buffer.from(hashPasscode(passcode, team.salt), 'hex');

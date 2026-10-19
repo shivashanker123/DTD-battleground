@@ -623,6 +623,13 @@ const Console = ({ onSignOut }) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        {s.persistence?.status === 'degraded' && (
+          <p className="flex items-center gap-2 text-sm text-rose-900 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-left">
+            <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
+            State is not saving to disk. Recent changes remain in memory only. Check disk space and folder permissions; the server will retry automatically.
+            {s.persistence.lastError ? ` Last error: ${s.persistence.lastError}` : ''}
+          </p>
+        )}
         {s.isSampleQuestions && (
           <p className="flex items-center gap-2 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-left">
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden /> Running on SAMPLE questions. Put the reviewed bank in server/questions.json before the event.

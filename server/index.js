@@ -29,20 +29,45 @@ function loadState() {
 }
 
 const SAVE_DEBOUNCE_MS = 250;
+const SAVE_RETRY_BASE_MS = 1_000;
+const SAVE_RETRY_MAX_MS = 30_000;
 let saveRequested = false;
 let saveTimer = null;
+let saveRetryTimer = null;
 let saveRunning = null;
 let saveSequence = 0;
+const persistence = {
+  status: 'healthy',
+  consecutiveFailures: 0,
+  lastSuccessAt: null,
+  lastFailureAt: null,
+  lastError: null,
+  nextRetryAt: null
+};
+
+function scheduleFlush(delay) {
+  if (saveTimer || saveRetryTimer || saveRunning) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    void flushState();
+  }, delay);
+}
+
+function scheduleRetry() {
+  const delay = Math.min(SAVE_RETRY_BASE_MS * 2 ** (persistence.consecutiveFailures - 1), SAVE_RETRY_MAX_MS);
+  persistence.nextRetryAt = Date.now() + delay;
+  saveRetryTimer = setTimeout(() => {
+    saveRetryTimer = null;
+    persistence.nextRetryAt = null;
+    if (saveRequested) scheduleFlush(0);
+  }, delay);
+}
 
 // Coalesce a burst of mutations into one latest-state snapshot. Only one writer may run at a
 // time; otherwise an older write could complete after a newer one and overwrite it.
 function saveState() {
   saveRequested = true;
-  if (saveTimer || saveRunning) return;
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    void flushState();
-  }, SAVE_DEBOUNCE_MS);
+  scheduleFlush(SAVE_DEBOUNCE_MS);
 }
 
 async function flushState() {
@@ -60,13 +85,26 @@ async function flushState() {
 
   try {
     await saveRunning;
+    persistence.status = 'healthy';
+    persistence.consecutiveFailures = 0;
+    persistence.lastSuccessAt = Date.now();
+    persistence.lastError = null;
+    persistence.nextRetryAt = null;
   } catch (err) {
-    // Keep the state dirty so the next mutation retries persistence instead of silently losing it.
+    // Keep the state dirty so a later retry persists the latest in-memory snapshot. The existing
+    // state file is untouched because the atomic rename runs only after a successful temp write.
     saveRequested = true;
+    persistence.status = 'degraded';
+    persistence.consecutiveFailures += 1;
+    persistence.lastFailureAt = Date.now();
+    persistence.lastError = err instanceof Error ? err.message : String(err);
     console.error('Could not persist game state:', err);
   } finally {
     saveRunning = null;
-    if (saveRequested) saveState();
+    if (saveRequested) {
+      if (persistence.status === 'degraded') scheduleRetry();
+      else scheduleFlush(SAVE_DEBOUNCE_MS);
+    }
   }
 }
 
@@ -75,9 +113,18 @@ async function flushStateBeforeExit() {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  while (saveRunning || saveRequested) {
-    if (saveRunning) await saveRunning.catch(() => {});
-    else await flushState();
+  if (saveRetryTimer) {
+    clearTimeout(saveRetryTimer);
+    saveRetryTimer = null;
+  }
+  if (saveRunning) await saveRunning.catch(() => {});
+  if (saveRequested) await flushState();
+  if (saveRetryTimer) {
+    clearTimeout(saveRetryTimer);
+    saveRetryTimer = null;
+  }
+  if (saveRequested) {
+    console.error('State has not been persisted; fix the disk error before restarting the server.');
   }
 }
 
@@ -235,7 +282,8 @@ function adminState(now) {
     questions: questions.bank,
     questionFile: path.relative(process.cwd(), questions.file),
     questionWarnings: questions.warnings,
-    isSampleQuestions: questions.isSample
+    isSampleQuestions: questions.isSample,
+    persistence: { ...persistence, savePending: Boolean(saveRequested || saveRunning || saveTimer || saveRetryTimer) }
   };
 }
 
@@ -471,7 +519,7 @@ async function handleApi(req, res, pathname) {
     }
     return send(req, res, 200, result);
   } catch (err) {
-    if (err instanceof game.GameError) return send(req, res, err.status, { error: err.message });
+    if (err instanceof game.GameError) return send(req, res, err.status, { error: err.message }, err.headers);
     console.error(err);
     return send(req, res, 500, { error: 'Server error. Tell the technical operator.' });
   }
