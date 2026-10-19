@@ -514,9 +514,15 @@ function readStatic(file) {
 }
 
 const server = http.createServer((req, res) => {
-  const { pathname } = new URL(req.url, 'http://localhost');
-  if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
-  return serveStatic(req, res, pathname);
+  try {
+    const { pathname } = new URL(req.url, 'http://localhost');
+    if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
+    return serveStatic(req, res, pathname);
+  } catch (err) {
+    console.error(err);
+    res.writeHead(400);
+    res.end('Bad request');
+  }
 });
 
 let shuttingDown = false;
