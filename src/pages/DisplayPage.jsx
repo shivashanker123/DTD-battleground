@@ -48,6 +48,10 @@ export const DisplayPage = () => {
           </div>
           <FinalBoard rows={state.standings.final} large />
         </div>
+      ) : !state.standingsPublished ? (
+        state.phase !== 'registration' && (
+          <p className="text-5xl font-black text-slate-700 text-center py-20">Scores will be revealed soon</p>
+        )
       ) : (
         rows.length > 0 && (
           <table className="w-full text-2xl text-left bg-white rounded-2xl overflow-hidden border border-slate-200">

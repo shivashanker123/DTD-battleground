@@ -26,7 +26,10 @@ if (!ADMIN_PASSWORD) {
 
 function loadState() {
   if (!fs.existsSync(STATE_FILE)) return game.createState();
-  return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  const loaded = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+  // Save files from before standings could be hidden start hidden, like a new event.
+  if (typeof loaded.standingsPublished !== 'boolean') loaded.standingsPublished = false;
+  return loaded;
 }
 
 // Short batching window: long enough to merge a burst of changes into one write, short enough
@@ -247,10 +250,31 @@ function teamRound2(team) {
   };
 }
 
+// Final standings safe to show while earlier rankings are hidden: ranked by final score only, ties share a
+// rank and are listed alphabetically, and the qualifier rank (the stored tie-break) is left out. Otherwise,
+// with every finalist on 0 at the start, the board order would reveal the qualification ranking.
+function scoreOnlyFinal(rows) {
+  const sorted = rows
+    .map(({ qualifierRank: _qualifierRank, ...row }) => row)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  return sorted.map((row, i) => ({
+    ...row,
+    rank: sorted.findIndex((r) => r.score === row.score) + 1,
+    tied: sorted.some((r, j) => j !== i && r.score === row.score)
+  }));
+}
+
+// What teams, visitors and the projector may see. While standings are hidden (the default), no Round 1,
+// Round 2 or qualification rankings leave the server: a signed-in team gets only its own scores. Starting
+// Round 3 makes the finalist list and live final scores public; publishing reveals everything.
 function publicState(session, now) {
   const { phase, config } = state;
+  const published = state.standingsPublished === true;
+  const finalStarted = ['round3', 'finished'].includes(phase);
+  const showFinal = published || finalStarted;
   const standings = game.computeStandings(state);
   const strip = (rows) => rows.map(({ members: _members, ...row }) => row);
+  const finalists = state.r3.finalists.filter((id) => state.teams[id]);
   const view = {
     serverNow: now,
     phase,
@@ -258,19 +282,32 @@ function publicState(session, now) {
     registrationOpen: ['registration', 'practice'].includes(phase) || state.lateRegistration,
     config: { maxTeamSize: config.maxTeamSize, r1: config.r1, r2: config.r2, r3: config.r3 },
     counts: { round1: questions.bank.round1.length, teams: Object.keys(state.teams).length },
+    standingsPublished: published,
     standings: {
-      qualification: strip(standings.qualification),
-      round1: strip(standings.round1),
-      round2: strip(standings.round2),
-      final: standings.final
+      qualification: published ? strip(standings.qualification) : [],
+      round1: published ? strip(standings.round1) : [],
+      round2: published ? strip(standings.round2) : [],
+      final: showFinal ? (published ? standings.final : scoreOnlyFinal(standings.final)) : []
     },
-    finalists: state.r3.finalists,
+    // Stored in qualifying order, so only shown in that order once standings are public.
+    finalists: !showFinal
+      ? []
+      : published
+        ? finalists
+        : [...finalists].sort((a, b) => state.teams[a].name.localeCompare(state.teams[b].name)),
     round3: ['round3', 'finished'].includes(phase) ? publicR3(now) : null,
     me: null
   };
   if (session) {
     const { team, member } = session;
     view.me = { teamId: team.id, teamName: team.name, member, members: team.members };
+    // The team's own results, always visible to it; no ranks, so nothing about other teams leaks.
+    const mine = standings.qualification.find((r) => r.teamId === team.id);
+    view.myScores = mine && {
+      r1: { points: mine.r1.points, correct: mine.r1.correct, attempted: mine.r1.attempted, timeMs: mine.r1.timeMs },
+      r2: { points: mine.r2.points, correct: mine.r2.correct, bought: mine.r2.bought, coinsSpent: mine.r2.coinsSpent },
+      total: mine.total
+    };
     if (phase === 'practice') view.practice = teamSprint(team, now, 'practice');
     else if (phase !== 'registration') view.round1 = teamSprint(team, now, 'round1');
     if (PHASES_FROM_R2.includes(phase)) view.round2 = teamRound2(team);
@@ -288,6 +325,7 @@ function adminState(now) {
   return {
     ...publicState(null, now),
     standings,
+    finalists: state.r3.finalists,
     lateRegistration: state.lateRegistration,
     teams: Object.values(state.teams).map((t) => ({
       id: t.id,
@@ -399,6 +437,7 @@ const routes = {
   }),
   'GET /api/admin/state': admin(({ now }) => adminState(now)),
   'GET /api/admin/standings.csv': admin(() => ({ csv: standingsCsv() })),
+  'POST /api/admin/standings-visibility': admin(({ body }) => game.setStandingsVisibility(state, body.published)),
   'GET /api/admin/backup': admin(() => ({ download: state })),
 
   'POST /api/admin/phase': admin(({ body, now }) => game.setPhase(state, body.phase, now)),

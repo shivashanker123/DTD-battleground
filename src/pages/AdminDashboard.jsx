@@ -172,6 +172,42 @@ const Prices = ({ s, run }) => {
 
 // ---------- teams & scores ----------
 
+// Rankings stay private until published. The server enforces this; the console always sees everything.
+const StandingsVisibility = ({ s, run }) => {
+  const published = s.standingsPublished;
+  const toggle = () => {
+    const message = published
+      ? 'Hide the standings? Teams and the projector will see "Scores will be revealed soon".'
+      : 'Publish the standings? Everyone will see the Round 1, Round 2 and qualification rankings.';
+    if (window.confirm(message)) run('/admin/standings-visibility', { published: !published });
+  };
+  return (
+    <Section
+      title="Leaderboard visibility"
+      actions={
+        <button type="button" className={published ? SECONDARY : PRIMARY} onClick={toggle}>
+          {published ? 'Hide standings' : 'Publish standings'}
+        </button>
+      }
+    >
+      <p className="text-sm">
+        {published ? (
+          <span className="font-bold text-emerald-700">Published:</span>
+        ) : (
+          <span className="font-bold text-amber-700">Hidden:</span>
+        )}{' '}
+        {published
+          ? 'everyone can see the Round 1, Round 2 and qualification rankings.'
+          : 'teams and the projector see "Scores will be revealed soon". Each team still sees its own scores.'}
+      </p>
+      <p className="text-xs text-slate-500">
+        Starting Round 3 makes the finalists and live final scores public automatically. While standings stay hidden,
+        the final board lists tied finalists alphabetically and never shows qualification ranks.
+      </p>
+    </Section>
+  );
+};
+
 const Teams = ({ s, run }) => {
   const rows = s.standings.qualification;
   const teamById = Object.fromEntries(s.teams.map((t) => [t.id, t]));
@@ -590,7 +626,9 @@ const Console = ({ onSignOut }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="text-left">
             <p className="font-black text-slate-900">DTD Battleground · Organisers</p>
-            <p className="text-xs text-slate-500">{PHASE_LABELS[s.phase]} · {s.teams.length} teams</p>
+            <p className="text-xs text-slate-500">
+              {PHASE_LABELS[s.phase]} · {s.teams.length} teams · leaderboard {s.standingsPublished ? 'published' : 'hidden'}
+            </p>
           </div>
           <nav className="flex flex-wrap gap-1" aria-label="Console sections">
             {TABS.map((t) => (
@@ -670,6 +708,7 @@ const Console = ({ onSignOut }) => {
         )}
         {tab === 'teams' && (
           <>
+            <StandingsVisibility s={s} run={run} />
             <Teams s={s} run={run} />
             <Corrections s={s} run={run} />
             <TieBreaks s={s} run={run} />

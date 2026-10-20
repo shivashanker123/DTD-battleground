@@ -48,3 +48,26 @@ the typed answer stays in the box with a message to tap Submit again.
 stress tests put normal replies at a few milliseconds, so that only happens when something is wrong.
 An action that timed out on the phone may still have been applied on the server; retrying then gets
 a clear server answer such as "already answered" or "already owns this question".
+
+## Leaderboard release control
+
+**Problem.** Every phone could see the live Round 1, Round 2 and qualification standings at all
+times, and the locked finalist list (stored in qualifying order) was public before the final began.
+
+**Choice.** A `standingsPublished` flag, off by default and kept through the normal save. Save files
+from before this change load as hidden. The server enforces it: while hidden, `GET /api/state` sends
+no Round 1, Round 2 or qualification standings to visitors, teams or the projector. Each signed-in
+team gets a separate `myScores` with its own points and no ranks, so its own score displays keep
+working. The organiser console (`GET /api/admin/state`) always has everything, and
+`POST /api/admin/standings-visibility` with `{"published": true|false}` (admin only) switches it,
+from a Publish/Hide control on the "Teams & scores" tab. The leaderboard and projector say
+"Scores will be revealed soon" while hidden. The CSV export was already admin-only.
+
+Starting Round 3 makes the finalist list and live final scores public even while standings are
+hidden. In that case the public final board ranks by final score only, lists tied finalists
+alphabetically and leaves out the "qualified #n" labels. Otherwise, with everyone on 0 at the start,
+the board order (whose tie-break is the qualifier rank) would reveal the qualification ranking.
+
+**Trade-off.** The live leaderboard is no longer on by default; organisers must remember to publish
+it, for example at the score check before the final. While hidden, tied finalists can't see from
+the board who would win the "higher qualifier" tie-break. The organiser console always shows it.

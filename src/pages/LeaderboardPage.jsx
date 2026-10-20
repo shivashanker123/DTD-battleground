@@ -71,6 +71,11 @@ export const LeaderboardPage = () => {
         ) : (
           <Card className="p-8 text-slate-500">Finalists are announced after Round 2.</Card>
         )
+      ) : !state.standingsPublished ? (
+        <Card className="p-8 text-center space-y-1">
+          <p className="font-black text-slate-900 text-lg">Scores will be revealed soon</p>
+          <p className="text-sm text-slate-500">The organisers will publish the standings. Your own scores are on the Play tab.</p>
+        </Card>
       ) : rows.length === 0 ? (
         <Card className="p-8 text-slate-500">No teams yet.</Card>
       ) : (

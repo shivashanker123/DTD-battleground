@@ -52,6 +52,8 @@ export function createState(config = DEFAULT_CONFIG) {
     phase: 'registration',
     timers: {},
     lateRegistration: false,
+    // Rankings stay private until organisers publish them (see publicState in index.js).
+    standingsPublished: false,
     teams: {},
     sessions: {},
     adminSessions: {},
@@ -455,6 +457,12 @@ export function markSuddenDeath(state, scope, teamId) {
   if (!state.teams[teamId]) fail('Team not found.', 404);
   if (teamId in table) return;
   table[teamId] = Object.keys(table).length;
+}
+
+export function setStandingsVisibility(state, published) {
+  if (typeof published !== 'boolean') fail('Send {"published": true} or {"published": false}.');
+  state.standingsPublished = published;
+  return { published };
 }
 
 export function clearSuddenDeath(state, scope) {

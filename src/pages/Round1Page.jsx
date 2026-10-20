@@ -25,7 +25,7 @@ const STATUS_TEXT = { locked: 'Not opened', active: 'Open now', correct: 'Correc
 
 // With `practice`, the same screen runs the unscored warm-up on its own questions.
 export const Round1Page = ({ practice = false }) => {
-  const { state, offset, act, me } = useEvent();
+  const { state, offset, act } = useEvent();
   const now = useServerNow(offset);
   const [confirming, setConfirming] = useState(null);
   const [error, setError] = useState(null);
@@ -36,7 +36,7 @@ export const Round1Page = ({ practice = false }) => {
   const roundEnd = practice ? Infinity : state.timers.round1?.endsAt;
   const api = practice ? '/practice' : '/r1';
   const active = questions.find((q) => q.status === 'active');
-  const myRow = state.standings.round1.find((r) => r.teamId === me.teamId);
+  const myRow = state.myScores; // the team's own scores; visible even while standings are hidden
   const done = questions.filter((q) => ['correct', 'wrong', 'expired'].includes(q.status)).length;
   const canOpen = live && !active && roundEnd > now;
 

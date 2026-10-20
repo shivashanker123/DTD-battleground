@@ -13,10 +13,9 @@ export const Navbar = ({ currentTab, setCurrentTab }) => {
   const { state, offset, me, signOut, connectionLost } = useEvent();
   const now = useServerNow(offset, 1000);
   const timer = state?.timers?.[state.phase];
-  const myRow = me && state.standings.qualification.find((r) => r.teamId === me.teamId);
   const finalRow = me && state.standings.final.find((r) => r.teamId === me.teamId);
   const inFinal = ['round3', 'finished'].includes(state?.phase);
-  const score = inFinal && finalRow ? finalRow.score : myRow?.total;
+  const score = inFinal && finalRow ? finalRow.score : state?.myScores?.total;
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-2xs">

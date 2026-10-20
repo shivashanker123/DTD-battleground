@@ -184,10 +184,10 @@ const Solving = ({ state, round2, act }) => {
 };
 
 export const Round2Page = () => {
-  const { state, offset, act, me } = useEvent();
+  const { state, offset, act } = useEvent();
   const now = useServerNow(offset);
   const { round2, phase, timers } = state;
-  const myRow = state.standings.round2.find((r) => r.teamId === me.teamId);
+  const myRow = state.myScores; // the team's own scores; visible even while standings are hidden
   const buying = phase === 'round2_buy';
 
   return (

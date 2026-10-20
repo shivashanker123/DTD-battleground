@@ -109,7 +109,7 @@ export const FinalBoard = ({ rows, highlightTeamId, large = false }) => (
             <td className="px-4 py-2 font-mono font-bold">{r.rank}</td>
             <td className="px-4 py-2">
               {r.name}
-              <span className="ml-2 text-xs text-slate-400">qualified #{r.qualifierRank}</span>
+              {r.qualifierRank && <span className="ml-2 text-xs text-slate-400">qualified #{r.qualifierRank}</span>}
             </td>
             <td className={`px-4 py-2 text-right font-mono font-black ${r.score < 0 ? 'text-rose-600' : ''}`}>{r.score}</td>
           </tr>
