@@ -1,4 +1,5 @@
 // Thin client for the game server. The browser only keeps sign-in tokens; all game state lives on the server.
+import { ACTION_TIMEOUT_MS, POLL_TIMEOUT_MS } from './connection';
 const TEAM_KEY = 'dtd_team_token';
 const ADMIN_KEY = 'dtd_admin_token';
 
@@ -34,24 +35,50 @@ export class ApiError extends Error {
   }
 }
 
-export async function api(path, { body, admin = false, method } = {}) {
+const networkError = (timedOut) =>
+  new ApiError(
+    timedOut
+      ? "The event server didn't answer in time. Check your Wi-Fi and try again."
+      : "Couldn't reach the event server. Check your Wi-Fi and try again.",
+    0
+  );
+
+// Every request has a deadline, so a dead Wi-Fi link fails fast instead of freezing a screen.
+// Status polls get POLL_TIMEOUT_MS; actions get longer because the server saves before replying.
+export async function api(path, { body, admin = false, method, timeoutMs } = {}) {
   const token = admin ? adminToken.get() : teamToken.get();
-  let res;
+  const isRead = body === undefined && (method ?? 'GET') === 'GET';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs ?? (isRead ? POLL_TIMEOUT_MS : ACTION_TIMEOUT_MS));
   try {
-    res = await fetch(`/api${path}`, {
-      method: method ?? (body === undefined ? 'GET' : 'POST'),
-      headers: {
-        ...(body !== undefined && { 'Content-Type': 'application/json' }),
-        ...(token && { Authorization: `Bearer ${token}` })
-      },
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-  } catch {
-    throw new ApiError('Cannot reach the event server. Check your connection.', 0);
+    let res;
+    try {
+      res = await fetch(`/api${path}`, {
+        method: method ?? (body === undefined ? 'GET' : 'POST'),
+        headers: {
+          ...(body !== undefined && { 'Content-Type': 'application/json' }),
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal
+      });
+    } catch {
+      throw networkError(controller.signal.aborted);
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      // A reply cut off by the timeout is a connection problem, not an empty answer. So is a
+      // "successful" non-JSON page, e.g. a Wi-Fi login portal answering instead of our server.
+      if (controller.signal.aborted || res.ok) throw networkError(controller.signal.aborted);
+      data = {};
+    }
+    if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status}).`, res.status);
+    return data;
+  } finally {
+    clearTimeout(timer);
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status}).`, res.status);
-  return data;
 }
 
 // Downloads an authenticated admin file (CSV standings or JSON backup).

@@ -8,7 +8,7 @@
     "server": "node --watch server/index.js",
     "build": "vite build --configLoader native",
     "start": "node server/index.js",
-    "test": "node --test server/game.test.js server/api.test.js",
+    "test": "node --test server/game.test.js server/api.test.js src/connection.test.js",
     "lint": "oxlint",
     "preview": "vite preview",
     "check-questions": "node server/check-questions.js"

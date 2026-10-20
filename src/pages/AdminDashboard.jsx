@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Download, LogOut, Monitor, ShieldAlert } from 'lucide-react';
 import { api, adminToken, downloadAdminFile } from '../api';
 import { usePolledState, useServerNow } from '../context/EventContext';
-import { Card, Countdown, ErrorNote, PHASE_LABELS, formatSeconds } from '../components/ui';
+import { Card, ConnectionBanner, Countdown, ErrorNote, PHASE_LABELS, formatSeconds } from '../components/ui';
+import { CONNECTION_LOST_TEXT } from '../connection';
 import { FinalBoard, FinalQuestion } from '../components/FinalLive';
 
 const BTN = 'px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed';
@@ -548,7 +549,7 @@ const TABS = [
 ];
 
 const Console = ({ onSignOut }) => {
-  const { data: s, error, offset, refresh } = usePolledState('/admin/state', { admin: true, interval: 1000 });
+  const { data: s, error, offset, refresh, connectionLost } = usePolledState('/admin/state', { admin: true, interval: 1000 });
   const now = useServerNow(offset, 250);
   const [tab, setTab] = useState('control');
   const [actionError, setActionError] = useState(null);
@@ -574,11 +575,18 @@ const Console = ({ onSignOut }) => {
     }
   }, [signedOut, onSignOut]);
 
-  if (!s) return <div className="min-h-screen flex items-center justify-center text-slate-500">{error?.message ?? 'Loading…'}</div>;
+  if (!s) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500 px-4 text-center">
+        {connectionLost ? CONNECTION_LOST_TEXT : (error?.message ?? 'Loading…')}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <ConnectionBanner lost={connectionLost} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="text-left">
             <p className="font-black text-slate-900">DTD Battleground · Organisers</p>
@@ -640,7 +648,7 @@ const Console = ({ onSignOut }) => {
             Question bank: {w}
           </p>
         ))}
-        <ErrorNote>{actionError || (error && `${error.message} Retrying…`)}</ErrorNote>
+        <ErrorNote>{actionError}</ErrorNote>
 
         {tab === 'control' && (
           <>

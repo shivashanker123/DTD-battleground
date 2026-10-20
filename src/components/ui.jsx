@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Clock, Loader2 } from 'lucide-react';
+import { Clock, Loader2, WifiOff } from 'lucide-react';
+import { CONNECTION_LOST_TEXT, isConnectivityError } from '../connection';
 
 export const PHASE_LABELS = {
   registration: 'Registration',
@@ -106,7 +107,12 @@ export const AnswerForm = ({ question, onSubmit, disabled, submitLabel = 'Submit
     try {
       await onSubmit(value);
     } catch (err) {
-      setError(err.message);
+      // The typed answer stays in the box either way; say so when the network was the problem.
+      setError(
+        isConnectivityError(err)
+          ? "Your answer wasn't sent because the event server couldn't be reached. It's still here — tap Submit again."
+          : err.message
+      );
     } finally {
       setBusy(false);
     }
@@ -178,3 +184,19 @@ export const EmptyNote = ({ title, children }) => (
     <div className="text-sm text-slate-600 max-w-lg mx-auto">{children}</div>
   </Card>
 );
+
+// Non-blocking connectivity warning. Rendered in normal flow (inside sticky headers where there is one),
+// so the last known state and timers stay visible underneath.
+export const ConnectionBanner = ({ lost, large = false }) =>
+  lost ? (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`flex items-center justify-center gap-2 bg-amber-400 text-slate-900 font-bold text-center px-4 ${
+        large ? 'text-3xl py-4' : 'text-sm py-2'
+      }`}
+    >
+      <WifiOff className={large ? 'w-8 h-8' : 'w-4 h-4'} aria-hidden />
+      <span>{CONNECTION_LOST_TEXT}</span>
+    </div>
+  ) : null;

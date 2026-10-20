@@ -1,13 +1,20 @@
 import React from 'react';
 import { usePolledState, useServerNow } from '../context/EventContext';
-import { Countdown, PHASE_LABELS } from '../components/ui';
+import { ConnectionBanner, Countdown, PHASE_LABELS } from '../components/ui';
+import { CONNECTION_LOST_TEXT } from '../connection';
 import { FinalBoard, FinalQuestion } from '../components/FinalLive';
 
 // Projector screen for the hall: phase, big timer, live standings, and the final's question and buzz order.
 export const DisplayPage = () => {
-  const { data: state, error, offset } = usePolledState('/state', { interval: 700 });
+  const { data: state, error, offset, connectionLost } = usePolledState('/state', { interval: 700 });
   const now = useServerNow(offset, 200);
-  if (!state) return <div className="min-h-screen flex items-center justify-center text-2xl text-slate-500">{error?.message ?? 'Connecting…'}</div>;
+  if (!state) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-2xl text-slate-500">
+        {connectionLost ? CONNECTION_LOST_TEXT : (error?.message ?? 'Connecting…')}
+      </div>
+    );
+  }
 
   const timer = state.timers[state.phase];
   const inFinal = ['round3', 'finished'].includes(state.phase);
@@ -15,6 +22,11 @@ export const DisplayPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 space-y-8">
+      {connectionLost && (
+        <div className="-mx-8 -mt-8">
+          <ConnectionBanner lost large />
+        </div>
+      )}
       <header className="flex flex-wrap items-center justify-between gap-6">
         <div className="text-left">
           <p className="text-xl font-bold uppercase tracking-wider text-slate-500">DTD Battleground</p>

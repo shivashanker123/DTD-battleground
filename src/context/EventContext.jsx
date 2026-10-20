@@ -1,13 +1,18 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { api, teamToken } from '../api';
+import { initialConnection, isConnectivityError, nextConnection, pollDelay } from '../connection';
 
 const EventContext = createContext(null);
 
 // Polls the server and keeps a clock offset so every countdown follows server time, not the device clock.
+// Also tracks connectivity: `connectionLost` turns on after two failed polls or ~5 s without a successful
+// one, and clears on the next success. The last good data stays available underneath.
 export function usePolledState(path, { admin = false, interval = 1500, enabled = true } = {}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
+  const [connection, setConnection] = useState(() => initialConnection(Date.now()));
+  const failures = useRef(0);
   const timer = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -20,9 +25,13 @@ export function usePolledState(path, { admin = false, interval = 1500, enabled =
       setOffset(next.serverNow - (sentAt + receivedAt) / 2);
       setData(next);
       setError(null);
+      failures.current = 0;
+      setConnection((c) => nextConnection(c, { type: 'success' }, Date.now()));
       return next;
     } catch (err) {
       setError(err);
+      if (isConnectivityError(err)) failures.current += 1;
+      setConnection((c) => nextConnection(c, { type: 'failure', error: err }, Date.now()));
       return null;
     }
   }, [path, admin]);
@@ -32,7 +41,8 @@ export function usePolledState(path, { admin = false, interval = 1500, enabled =
     let cancelled = false;
     const loop = async () => {
       const latest = await refresh();
-      if (!cancelled) timer.current = setTimeout(loop, typeof interval === 'function' ? interval(latest) : interval);
+      const base = typeof interval === 'function' ? interval(latest) : interval;
+      if (!cancelled) timer.current = setTimeout(loop, pollDelay(base, failures.current));
     };
     loop();
     return () => {
@@ -41,7 +51,18 @@ export function usePolledState(path, { admin = false, interval = 1500, enabled =
     };
   }, [refresh, interval, enabled]);
 
-  return { data, error, offset, refresh };
+  // A phone waking up (or a tab coming back) starts a fresh window rather than flashing the warning.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      failures.current = 0;
+      setConnection((c) => nextConnection(c, { type: 'resumed' }, Date.now()));
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  return { data, error, offset, refresh, connectionLost: connection.lost };
 }
 
 // Re-renders on an interval and returns the current server time.
@@ -59,7 +80,7 @@ const pollInterval = (latest) => (latest?.phase === 'round3' ? 700 : 1500);
 
 export const EventProvider = ({ children }) => {
   const [notice, setNotice] = useState(null);
-  const { data, error, offset, refresh } = usePolledState('/state', { interval: pollInterval });
+  const { data, error, offset, refresh, connectionLost } = usePolledState('/state', { interval: pollInterval });
 
   // A token the server no longer recognises means this member signed in on another device.
   useEffect(() => {
@@ -93,7 +114,7 @@ export const EventProvider = ({ children }) => {
 
   return (
     <EventContext.Provider
-      value={{ state: data, error, offset, refresh, signIn, signOut, act, notice, me: data?.me ?? null }}
+      value={{ state: data, error, offset, refresh, signIn, signOut, act, notice, connectionLost, me: data?.me ?? null }}
     >
       {children}
     </EventContext.Provider>

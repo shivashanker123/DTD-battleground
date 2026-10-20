@@ -3,7 +3,8 @@ import { Loader2, Users } from 'lucide-react';
 import { EventProvider, useEvent } from './context/EventContext';
 import { Navbar } from './components/Navbar';
 import { InstagramIcon } from './components/Icons';
-import { Card, EmptyNote } from './components/ui';
+import { Card, ConnectionBanner, EmptyNote } from './components/ui';
+import { CONNECTION_LOST_TEXT } from './connection';
 import { EntryPage, LandingPage } from './pages/LandingPage';
 import { Round1Page } from './pages/Round1Page';
 import { Round2Page } from './pages/Round2Page';
@@ -57,24 +58,25 @@ const PlayPage = () => {
 };
 
 const MainApp = () => {
-  const { state, error, me } = useEvent();
+  const { state, error, me, connectionLost } = useEvent();
   const [currentTab, setCurrentTab] = useState('play');
 
   if (!state) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500 gap-2">
-        {error ? error.message : <Loader2 className="w-5 h-5 animate-spin" aria-label="Loading" />}
+      <div className="min-h-screen flex items-center justify-center text-slate-500 gap-2 px-4 text-center">
+        {connectionLost ? CONNECTION_LOST_TEXT : error ? error.message : <Loader2 className="w-5 h-5 animate-spin" aria-label="Loading" />}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans selection:bg-slate-900 selection:text-white">
-      {me && <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} />}
-      {error && (
-        <p role="alert" className="bg-amber-100 text-amber-900 text-sm text-center px-4 py-2">
-          {error.message} Retrying…
-        </p>
+      {me ? (
+        <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      ) : (
+        <div className="sticky top-0 z-40">
+          <ConnectionBanner lost={connectionLost} />
+        </div>
       )}
       <main className="flex-1 pb-16">
         {!me && <EntryPage />}

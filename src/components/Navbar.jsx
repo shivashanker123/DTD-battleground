@@ -1,7 +1,7 @@
 import React from 'react';
 import { Gamepad2, Trophy, BookOpen, LogOut } from 'lucide-react';
 import { useEvent, useServerNow } from '../context/EventContext';
-import { Countdown, PHASE_LABELS } from './ui';
+import { ConnectionBanner, Countdown, PHASE_LABELS } from './ui';
 
 const TABS = [
   { id: 'play', label: 'Play', icon: Gamepad2 },
@@ -10,7 +10,7 @@ const TABS = [
 ];
 
 export const Navbar = ({ currentTab, setCurrentTab }) => {
-  const { state, offset, me, signOut } = useEvent();
+  const { state, offset, me, signOut, connectionLost } = useEvent();
   const now = useServerNow(offset, 1000);
   const timer = state?.timers?.[state.phase];
   const myRow = me && state.standings.qualification.find((r) => r.teamId === me.teamId);
@@ -20,6 +20,7 @@ export const Navbar = ({ currentTab, setCurrentTab }) => {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-2xs">
+      <ConnectionBanner lost={connectionLost} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           <button type="button" className="flex flex-col text-left" onClick={() => setCurrentTab('play')}>
