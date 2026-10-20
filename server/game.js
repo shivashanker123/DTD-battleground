@@ -123,9 +123,12 @@ const positiveInt = (value, fallback) => {
 };
 
 // Bound expensive scrypt work. Node's worker pool already limits simultaneous hashing, but this
-// small application-level queue prevents an unbounded registration flood from consuming memory.
+// application-level queue prevents an unbounded sign-in flood from consuming memory. The queue is
+// sized so a whole room signing in at once (100+ phones) waits a second or two instead of being
+// turned away; each waiting entry costs only a few hundred bytes.
 const MAX_HASHES = positiveInt(process.env.HASH_CONCURRENCY, 4);
-const MAX_HASH_WAITERS = positiveInt(process.env.HASH_QUEUE_LIMIT, 32);
+const MAX_HASH_WAITERS = positiveInt(process.env.HASH_QUEUE_LIMIT, 256);
+export const HASH_LIMITS = Object.freeze({ concurrency: MAX_HASHES, queue: MAX_HASH_WAITERS });
 let activeHashes = 0;
 const hashWaiters = [];
 
@@ -145,7 +148,7 @@ function runBoundedHash(work) {
     const job = { work, resolve, reject };
     if (activeHashes < MAX_HASHES) return startHashJob(job);
     if (hashWaiters.length >= MAX_HASH_WAITERS) {
-      return reject(new GameError('Registration is busy. Please wait a moment and try again.', 503, { 'Retry-After': '2' }));
+      return reject(new GameError('Sign-in is busy. Please wait a moment and try again.', 503, { 'Retry-After': '2' }));
     }
     hashWaiters.push(job);
   });

@@ -1,5 +1,6 @@
 // DTD Battleground server: owns timers, access, answer checking and totals.
-// State is persisted in short, serialized batches so a registration rush cannot freeze the event loop.
+// State is persisted in short, serialized batches so a registration rush cannot freeze the event loop,
+// and every change is on disk before its request is answered.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,9 @@ function loadState() {
   return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
 }
 
-const SAVE_DEBOUNCE_MS = 250;
+// Short batching window: long enough to merge a burst of changes into one write, short enough
+// that requests (which wait for the save before replying) stay snappy.
+const SAVE_DEBOUNCE_MS = 50;
 const SAVE_RETRY_BASE_MS = 1_000;
 const SAVE_RETRY_MAX_MS = 30_000;
 let saveRequested = false;
@@ -36,6 +39,8 @@ let saveTimer = null;
 let saveRetryTimer = null;
 let saveRunning = null;
 let saveSequence = 0;
+// Requests waiting for the next write that will contain their change.
+let saveWaiters = [];
 const persistence = {
   status: 'healthy',
   consecutiveFailures: 0,
@@ -65,9 +70,19 @@ function scheduleRetry() {
 
 // Coalesce a burst of mutations into one latest-state snapshot. Only one writer may run at a
 // time; otherwise an older write could complete after a newer one and overwrite it.
+// Returns a promise that settles once a write containing this change has finished, so a request
+// can reply "OK" only when the change is on disk ("group commit"). While the disk is failing we
+// do not make requests wait for retries: they are answered from memory and the console shows the
+// degraded-persistence warning.
 function saveState() {
   saveRequested = true;
   scheduleFlush(SAVE_DEBOUNCE_MS);
+  if (persistence.status === 'degraded') return Promise.resolve();
+  return new Promise((resolve) => saveWaiters.push(resolve));
+}
+
+function releaseWaiters(waiters) {
+  for (const resolve of waiters) resolve();
 }
 
 async function flushState() {
@@ -75,6 +90,9 @@ async function flushState() {
   if (!saveRequested) return;
 
   saveRequested = false;
+  // Everyone who asked for a save up to this point is covered by this snapshot.
+  const waiters = saveWaiters;
+  saveWaiters = [];
   const snapshot = JSON.stringify(state);
   const tmp = `${STATE_FILE}.${process.pid}.${++saveSequence}.tmp`;
   saveRunning = (async () => {
@@ -101,6 +119,7 @@ async function flushState() {
     console.error('Could not persist game state:', err);
   } finally {
     saveRunning = null;
+    releaseWaiters(waiters);
     if (saveRequested) {
       if (persistence.status === 'degraded') scheduleRetry();
       else scheduleFlush(SAVE_DEBOUNCE_MS);
@@ -126,6 +145,8 @@ async function flushStateBeforeExit() {
   if (saveRequested) {
     console.error('State has not been persisted; fix the disk error before restarting the server.');
   }
+  releaseWaiters(saveWaiters);
+  saveWaiters = [];
 }
 
 let state = loadState();
@@ -504,9 +525,9 @@ async function handleApi(req, res, pathname) {
       }
       throw err;
     }
-    // Every successful POST changes the game. Persistence is coalesced for 250 ms but flushed
-    // serially, keeping state safe without blocking a registration burst.
-    if (req.method === 'POST') saveState();
+    // Every successful POST changes the game. Saves are batched (50 ms) and written one at a time;
+    // the reply waits for the write, so "OK" always means the change survives a crash.
+    if (req.method === 'POST') await saveState();
     if (result.csv !== undefined) {
       res.writeHead(200, {
         'Content-Type': 'text/csv; charset=utf-8',

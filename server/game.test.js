@@ -76,9 +76,10 @@ test('async registration and login keep the same auth rules without blocking the
 
 test('async password hashing rejects excess queued work with a retry response', async () => {
   const state = game.createState();
-  // Defaults are four active hashes plus a 32-request waiting room. Every call reaches the
-  // first await before a hash can complete, making the 37th request deterministic overflow.
-  const attempts = Array.from({ length: 37 }, (_, i) =>
+  // Every call reaches the first await before a hash can complete, so the request after
+  // "active hashes + waiting room" is a deterministic overflow.
+  const { concurrency, queue } = game.HASH_LIMITS;
+  const attempts = Array.from({ length: concurrency + queue + 1 }, (_, i) =>
     game.registerTeamAsync(state, { teamName: `Burst ${i}`, passcode: 'pass1234', member: `Lead ${i}` }, T0)
   );
   const results = await Promise.allSettled(attempts);
