@@ -22,7 +22,8 @@ export function nextConnection(prev, outcome, now) {
   if (outcome.type === 'success') return { failures: 0, lastSuccessAt: now, lost: false };
   // A phone waking up or a tab coming back to the front starts a fresh window, so a poll that
   // stalled while the screen was off does not flash the warning.
-  if (outcome.type === 'resumed') return { ...prev, failures: 0, lastSuccessAt: now, lost: false };
+  // An existing warning stays until a poll actually succeeds.
+  if (outcome.type === 'resumed') return { ...prev, failures: 0, lastSuccessAt: now };
   if (!isConnectivityError(outcome.error)) return prev;
   const failures = prev.failures + 1;
   const lost = failures >= LOST_AFTER_FAILURES || now - prev.lastSuccessAt >= LOST_AFTER_SILENCE_MS;

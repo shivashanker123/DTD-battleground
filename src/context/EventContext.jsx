@@ -80,10 +80,13 @@ const pollInterval = (latest) => (latest?.phase === 'round3' ? 700 : 1500);
 
 export const EventProvider = ({ children }) => {
   const [notice, setNotice] = useState(null);
+  const signingOut = useRef(false);
   const { data, error, offset, refresh, connectionLost } = usePolledState('/state', { interval: pollInterval });
 
   // A token the server no longer recognises means this member signed in on another device.
   useEffect(() => {
+    // A poll that raced our own sign-out is not "signed in elsewhere".
+    if (signingOut.current) return;
     if (data?.usedToken && !data.me && data.usedToken === teamToken.get()) {
       teamToken.set(null);
       setNotice('You were signed out: your name was used to sign in on another device, or an organiser removed your team.');
@@ -98,9 +101,14 @@ export const EventProvider = ({ children }) => {
   };
 
   const signOut = async () => {
-    await api('/logout', { body: {} }).catch(() => {});
-    teamToken.set(null);
-    await refresh();
+    signingOut.current = true;
+    try {
+      await api('/logout', { body: {} }).catch(() => {});
+      teamToken.set(null);
+      await refresh();
+    } finally {
+      signingOut.current = false;
+    }
   };
 
   // Runs a team action, then refreshes so every screen reflects the server's answer.

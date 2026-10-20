@@ -153,6 +153,7 @@ async function flushStateBeforeExit() {
 }
 
 let state = loadState();
+let shuttingDown = false;
 const questions = loadQuestions(here, state.config);
 if (questions.isSample) console.warn('Using SAMPLE questions. Put the real bank in server/questions.json.');
 for (const w of questions.warnings) console.warn(`Question bank: ${w}`);
@@ -253,14 +254,17 @@ function teamRound2(team) {
 // Final standings safe to show while earlier rankings are hidden: ranked by final score only, ties share a
 // rank and are listed alphabetically, and the qualifier rank (the stored tie-break) is left out. Otherwise,
 // with every finalist on 0 at the start, the board order would reveal the qualification ranking.
+// Sudden-death results in the final are public results, so they still break ties here.
 function scoreOnlyFinal(rows) {
+  const sd = (row) => state.suddenDeath.final?.[row.teamId] ?? Infinity;
+  const level = (a, b) => a.score === b.score && sd(a) === sd(b);
   const sorted = rows
     .map(({ qualifierRank: _qualifierRank, ...row }) => row)
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    .sort((a, b) => b.score - a.score || sd(a) - sd(b) || a.name.localeCompare(b.name) || a.teamId.localeCompare(b.teamId));
   return sorted.map((row, i) => ({
     ...row,
-    rank: sorted.findIndex((r) => r.score === row.score) + 1,
-    tied: sorted.some((r, j) => j !== i && r.score === row.score)
+    rank: sorted.findIndex((r) => level(r, row)) + 1,
+    tied: sorted.some((r, j) => j !== i && level(r, row))
   }));
 }
 
@@ -470,10 +474,12 @@ const routes = {
   'POST /api/admin/r3/adjust': admin(({ body, now }) => game.adjustR3(state, body, now)),
   'POST /api/admin/reset': admin(({ body }) => {
     if (body.confirm !== 'RESET') throw new game.GameError('Type RESET to confirm.');
-    const keepAdmins = state.adminSessions;
-    const config = state.config;
-    state = game.createState(config);
-    state.adminSessions = keepAdmins;
+    const fresh = game.createState(state.config);
+    fresh.adminSessions = state.adminSessions;
+    // Reset in place: a sign-in still hashing holds a reference to this object, and must see the new
+    // (empty) event rather than writing into a discarded one.
+    for (const k of Object.keys(state)) delete state[k];
+    Object.assign(state, fresh);
   })
 };
 
@@ -535,8 +541,13 @@ function failureEntry(key, now) {
 }
 
 async function handleApi(req, res, pathname) {
-  const route = routes[`${req.method} ${pathname}`];
+  const key = `${req.method} ${pathname}`;
+  const route = Object.hasOwn(routes, key) ? routes[key] : null;
   if (!route) return send(req, res, 404, { error: 'Not found.' });
+  // While stopping, refuse new changes instead of answering "OK" for something that won't be saved.
+  if (shuttingDown && req.method === 'POST') {
+    return send(req, res, 503, { error: 'The server is restarting. Try again in a moment.' }, { 'Retry-After': '2' });
+  }
   try {
     const now = Date.now();
     if (game.tick(state, now)) saveState();
@@ -545,7 +556,8 @@ async function handleApi(req, res, pathname) {
     if (route.auth === 'team' && !session) {
       return send(req, res, 401, { error: 'You have been signed out. Sign in again with your team passcode.' });
     }
-    if (route.auth === 'admin' && !state.adminSessions[token]) {
+    // Own keys only: otherwise "Bearer constructor" or "Bearer toString" would pass as an admin token.
+    if (route.auth === 'admin' && !(token && Object.hasOwn(state.adminSessions, token))) {
       return send(req, res, 401, { error: 'Admin sign-in required.' });
     }
     const body = req.method === 'POST' ? await readBody(req) : {};
@@ -633,11 +645,11 @@ const server = http.createServer((req, res) => {
   }
 });
 
-let shuttingDown = false;
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {
     if (shuttingDown) return;
     shuttingDown = true;
+    server.close(); // stop accepting new connections; in-flight requests finish
     void flushStateBeforeExit().finally(() => process.exit(0));
   });
 }

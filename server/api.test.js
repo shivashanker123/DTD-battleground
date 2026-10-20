@@ -206,3 +206,42 @@ test('starting the final reveals finalists and live scores without leaking quali
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('built-in object property names are never accepted as admin or team tokens', async () => {
+  const dir = tempDir();
+  const srv = await startServer(dir);
+  try {
+    for (const token of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+      assert.equal((await srv.call('GET', '/admin/state', undefined, token)).status, 401, token);
+      assert.equal((await srv.call('GET', '/admin/backup', undefined, token)).status, 401, token);
+      assert.equal((await srv.call('POST', '/admin/standings-visibility', { published: true }, token)).status, 401, token);
+      assert.equal((await srv.call('POST', '/logout', {}, token)).status, 401, token);
+    }
+    assert.equal((await srv.call('GET', '/constructor')).status, 404);
+  } finally {
+    await srv.stop();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('while standings are hidden, the public final board still follows sudden-death results', async () => {
+  const dir = tempDir();
+  const srv = await startServer(dir);
+  try {
+    const { admin, ids } = await twoTeamEvent(srv);
+    await srv.call('POST', '/admin/phase', { phase: 'round2_closed' }, admin);
+    await srv.call('POST', '/admin/finalists', {}, admin);
+    await srv.call('POST', '/admin/phase', { phase: 'round3' }, admin);
+    // Both finalists on 0; Zeta wins a sudden-death question.
+    assert.equal((await srv.call('POST', '/admin/sudden-death', { scope: 'final', teamId: ids.Zeta }, admin)).status, 200);
+    const live = (await srv.call('GET', '/state')).body;
+    assert.deepEqual(
+      live.standings.final.map((r) => [r.name, r.rank, r.tied]),
+      [['Zeta', 1, false], ['Alpha', 2, false]]
+    );
+    assert.ok(hiddenStandings(live));
+  } finally {
+    await srv.stop();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

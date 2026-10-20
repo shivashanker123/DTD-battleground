@@ -46,6 +46,16 @@ test('waking the phone starts a fresh window instead of flashing the warning', (
   assert.equal(c.lost, false);
 });
 
+test('waking the phone does not clear a warning that is already showing', () => {
+  let c = initialConnection(T0);
+  c = nextConnection(c, fail(0), T0 + 100);
+  c = nextConnection(c, fail(0), T0 + 200);
+  c = nextConnection(c, { type: 'resumed' }, T0 + 60_000);
+  assert.equal(c.lost, true, 'only a successful poll clears it');
+  c = nextConnection(c, { type: 'success' }, T0 + 61_000);
+  assert.equal(c.lost, false);
+});
+
 test('polling backs off gently while failing and never goes past 5 s', () => {
   assert.equal(pollDelay(1500, 0), 1500);
   assert.equal(pollDelay(1500, 1), 1500);

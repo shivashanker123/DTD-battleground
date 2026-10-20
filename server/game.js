@@ -293,7 +293,8 @@ export async function loginTeamAsync(state, input, now) {
 }
 
 export function getSession(state, token) {
-  const session = token && state.sessions[token];
+  // Own keys only: a token like "constructor" must not match a built-in object property.
+  const session = token && Object.hasOwn(state.sessions, token) ? state.sessions[token] : null;
   if (!session) return null;
   const team = state.teams[session.teamId];
   return team ? { team, member: session.member } : null;

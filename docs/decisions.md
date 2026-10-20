@@ -71,3 +71,26 @@ the board order (whose tie-break is the qualifier rank) would reveal the qualifi
 **Trade-off.** The live leaderboard is no longer on by default; organisers must remember to publish
 it, for example at the score check before the final. While hidden, tied finalists can't see from
 the board who would win the "higher qualifier" tie-break. The organiser console always shows it.
+
+## Review fixes
+
+**Admin token bypass (also present on main).** Session lookups used `object[token]`, so a request
+with `Authorization: Bearer constructor` (or `toString`, `__proto__`) matched a built-in property and
+passed the admin check, exposing hidden standings, backups and the publish switch. Lookups now use
+own keys only (`Object.hasOwn`) for admin sessions, team sessions and routes. A test covers it.
+
+**Sudden death on the hidden final board.** While standings are hidden, the public final board
+ranks by final score only; it now also applies the organisers' final sudden-death marks (those are
+public final results), then alphabetical order.
+
+**Graceful stop.** On Ctrl+C the server stops accepting connections and answers any new change with
+503 "restarting", instead of answering "OK" for something it would not save.
+
+**Reset during a sign-in.** "Reset event" now clears the state in place, so a sign-in that was
+still hashing lands in the new (empty) event instead of a discarded copy.
+
+**Smaller UI fixes.** Signing out on purpose no longer shows the "signed in on another device"
+notice. Waking a phone no longer hides a connection warning before a poll actually succeeds.
+
+**Not changed.** Round 1 answer times now include the short save wait (about 50 ms) before the
+question appears. It applies equally to every team, so rankings are unaffected.
