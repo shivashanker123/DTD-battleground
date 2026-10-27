@@ -449,6 +449,7 @@ const routes = {
 
   'POST /api/admin/phase': admin(({ body, now }) => game.setPhase(state, body.phase, now)),
   'POST /api/admin/extend': admin(({ body }) => game.extendPhase(state, body.seconds)),
+  'POST /api/admin/duration': admin(({ body }) => game.setDuration(state, body.phase, body.minutes)),
   'POST /api/admin/late-registration': admin(({ body }) => {
     state.lateRegistration = Boolean(body.enabled);
   }),

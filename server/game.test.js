@@ -129,6 +129,24 @@ test('round 1 closes on its own and question deadlines never pass the round end'
   assert.equal(state.phase, 'round1_closed');
 });
 
+test('round lengths default to the timeline and can change only before each timer starts', () => {
+  const { state } = setup(1);
+  assert.equal(state.config.r1.durationSec, 20 * 60);
+  assert.equal(state.config.r2.solveSec, 20 * 60);
+  game.setDuration(state, 'round1', 25);
+  game.setDuration(state, 'round2_solve', 15);
+  assert.throws(() => game.setDuration(state, 'round1', 0), /whole number/);
+  assert.throws(() => game.setDuration(state, 'round1', 2.5), /whole number/);
+  assert.throws(() => game.setDuration(state, 'round3', 10), /Unknown/);
+  game.setPhase(state, 'round1', T0);
+  assert.equal(state.timers.round1.endsAt, T0 + 25 * 60_000);
+  assert.throws(() => game.setDuration(state, 'round1', 30), /already started/);
+  game.setDuration(state, 'round2_buy', 5); // later rounds stay editable
+  game.setPhase(state, 'round2_buy', T0);
+  assert.equal(game.tick(state, T0 + 5 * 60_000 + game.GRACE_MS), true);
+  assert.equal(state.timers.round2_solve.endsAt, T0 + 5 * 60_000 + 15 * 60_000);
+});
+
 test('round 2: budget, per-level caps, returns, no refunds, auto phase change', () => {
   const { state, teams } = setup(1);
   const [t] = teams;
