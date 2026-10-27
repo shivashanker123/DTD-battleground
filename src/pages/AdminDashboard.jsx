@@ -61,24 +61,33 @@ const Section = ({ title, children, actions }) => (
 
 // ---------- event control ----------
 
-const PHASE_ACTIONS = {
-  registration: [
-    { phase: 'practice', label: 'Start practice round', secondary: true, confirm: 'Open the unscored practice round? Teams can still register.' },
-    { phase: 'round1', label: 'Start Round 1 (30 min)', confirm: 'Start Round 1 now? The 30-minute timer starts for every team.' }
-  ],
-  practice: [{ phase: 'round1', label: 'End practice, start Round 1 (30 min)', confirm: 'Start Round 1 now? Registration closes and the 30-minute timer starts for every team.' }],
-  round1: [{ phase: 'round1_closed', label: 'End Round 1 now', danger: true, confirm: 'End Round 1 immediately?' }],
-  round1_closed: [{ phase: 'round2_buy', label: 'Open Round 2 market (4 min)', confirm: 'Open the market? Buying lasts 4 minutes, then solving starts automatically.' }],
-  round2_buy: [{ phase: 'round2_solve', label: 'End buying, start solving now', confirm: 'Close the market early and start the 25-minute solve?' }],
-  round2_solve: [{ phase: 'round2_closed', label: 'End Round 2 now', danger: true, confirm: 'End Round 2 immediately?' }],
-  round2_closed: [{ phase: 'round3', label: 'Start the final', confirm: 'Start Round 3? Lock the finalists first.' }],
-  round3: [{ phase: 'finished', label: 'Finish the event', confirm: 'Mark the event finished?' }],
-  finished: []
+const minutes = (sec) => Math.round(sec / 60);
+
+// Labels read the configured round lengths, which organisers can change in "Round lengths".
+const phaseActions = ({ r1, r2 }) => {
+  const r1Min = minutes(r1.durationSec);
+  const buyMin = minutes(r2.buySec);
+  const solveMin = minutes(r2.solveSec);
+  return {
+    registration: [
+      { phase: 'practice', label: 'Start practice round', secondary: true, confirm: 'Open the unscored practice round? Teams can still register.' },
+      { phase: 'round1', label: `Start Round 1 (${r1Min} min)`, confirm: `Start Round 1 now? The ${r1Min}-minute timer starts for every team.` }
+    ],
+    practice: [{ phase: 'round1', label: `End practice, start Round 1 (${r1Min} min)`, confirm: `Start Round 1 now? Registration closes and the ${r1Min}-minute timer starts for every team.` }],
+    round1: [{ phase: 'round1_closed', label: 'End Round 1 now', danger: true, confirm: 'End Round 1 immediately?' }],
+    round1_closed: [{ phase: 'round2_buy', label: `Open Round 2 market (${buyMin} min)`, confirm: `Open the market? Buying lasts ${buyMin} minutes, then solving starts automatically.` }],
+    round2_buy: [{ phase: 'round2_solve', label: 'End buying, start solving now', confirm: `Close the market early and start the ${solveMin}-minute solve?` }],
+    round2_solve: [{ phase: 'round2_closed', label: 'End Round 2 now', danger: true, confirm: 'End Round 2 immediately?' }],
+    round2_closed: [{ phase: 'round3', label: 'Start the final', confirm: 'Start Round 3? Lock the finalists first.' }],
+    round3: [{ phase: 'finished', label: 'Finish the event', confirm: 'Mark the event finished?' }],
+    finished: []
+  };
 };
 
 const EventControl = ({ s, now, run }) => {
   const timer = s.timers[s.phase];
   const [manual, setManual] = useState(s.phase);
+  const { r1, r2 } = s.config;
   return (
     <Section title="Event control">
       <div className="flex flex-wrap items-center gap-3">
@@ -86,7 +95,7 @@ const EventControl = ({ s, now, run }) => {
         {timer && <Countdown endsAt={timer.endsAt} now={now} label="ends in" urgentBelow={60_000} />}
       </div>
       <div className="flex flex-wrap gap-2">
-        {PHASE_ACTIONS[s.phase].map((a) => (
+        {phaseActions(s.config)[s.phase].map((a) => (
           <button
             key={a.phase}
             type="button"
@@ -107,11 +116,18 @@ const EventControl = ({ s, now, run }) => {
             <button type="button" className={SECONDARY} onClick={() => run('/admin/extend', { seconds: -60 })}>
               −1 min
             </button>
+            <button type="button" className={SECONDARY} onClick={() => run('/admin/extend', { seconds: 300 })}>
+              +5 min
+            </button>
+            <button type="button" className={SECONDARY} onClick={() => run('/admin/extend', { seconds: -300 })}>
+              −5 min
+            </button>
           </>
         )}
       </div>
       <p className="text-xs text-slate-500">
-        Timed phases close by themselves: Round 1 after 30 min, buying after 4 min (solving then starts), solving after 25 min.
+        Timed phases close by themselves: Round 1 after {minutes(r1.durationSec)} min, buying after {minutes(r2.buySec)} min
+        (solving then starts), solving after {minutes(r2.solveSec)} min. The +/− buttons change the time left on a running timer.
       </p>
       <details className="text-sm">
         <summary className="cursor-pointer text-xs font-bold text-slate-600">Recovery: jump to any phase</summary>
@@ -142,6 +158,51 @@ const EventControl = ({ s, now, run }) => {
     </Section>
   );
 };
+
+const DURATION_ROWS = [
+  { phase: 'round1', label: 'Round 1', round: 'r1', field: 'durationSec' },
+  { phase: 'round2_buy', label: 'Round 2 buying', round: 'r2', field: 'buySec' },
+  { phase: 'round2_solve', label: 'Round 2 solving', round: 'r2', field: 'solveSec' }
+];
+const PHASE_ORDER = Object.keys(PHASE_LABELS);
+
+const RoundLengths = ({ s, run }) => (
+  <Section title="Round lengths">
+    <p className="text-xs text-slate-500">
+      Set each round’s length before it starts. Once a timer is running, use the +/− buttons in Event control instead.
+    </p>
+    <div className="flex flex-wrap gap-4">
+      {DURATION_ROWS.map(({ phase, label, round, field }) => {
+        const value = minutes(s.config[round][field]);
+        const started = PHASE_ORDER.indexOf(s.phase) >= PHASE_ORDER.indexOf(phase);
+        const set = (mins) => run('/admin/duration', { phase, minutes: mins });
+        return (
+          <div key={phase} className="text-sm flex items-center gap-2">
+            <span className="font-semibold">{label}</span>
+            <button type="button" className={SECONDARY} disabled={started || value <= 1} onClick={() => set(value - 1)} aria-label={`Shorten ${label} by 1 minute`}>
+              −
+            </button>
+            <input
+              key={value}
+              type="number"
+              min="1"
+              max="120"
+              disabled={started}
+              defaultValue={value}
+              onBlur={(e) => Number(e.target.value) !== value && set(Number(e.target.value))}
+              className={`${INPUT} w-20 text-center`}
+              aria-label={`${label} minutes`}
+            />
+            <button type="button" className={SECONDARY} disabled={started || value >= 120} onClick={() => set(value + 1)} aria-label={`Lengthen ${label} by 1 minute`}>
+              +
+            </button>
+            <span className="text-xs text-slate-500">{started ? 'min · started' : 'min'}</span>
+          </div>
+        );
+      })}
+    </div>
+  </Section>
+);
 
 const Prices = ({ s, run }) => {
   const locked = !['registration', 'practice', 'round1', 'round1_closed'].includes(s.phase);
@@ -691,6 +752,7 @@ const Console = ({ onSignOut }) => {
         {tab === 'control' && (
           <>
             <EventControl key={s.phase} s={s} now={now} run={run} />
+            <RoundLengths s={s} run={run} />
             <Prices s={s} run={run} />
             <Section title="Danger zone">
               <button

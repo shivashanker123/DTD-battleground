@@ -19,10 +19,10 @@ export const GRACE_MS = 2000;
 
 export const DEFAULT_CONFIG = {
   maxTeamSize: 3,
-  r1: { durationSec: 30 * 60, questionSec: 60, points: 50 },
+  r1: { durationSec: 20 * 60, questionSec: 60, points: 50 },
   r2: {
     buySec: 4 * 60,
-    solveSec: 25 * 60,
+    solveSec: 20 * 60,
     startCoins: 200,
     levels: {
       easy: { cost: 10, points: 30, max: 10 },
@@ -80,6 +80,26 @@ export function setPhase(state, phase, now) {
   } else if (phase === 'round2_solve') {
     state.timers.round2_solve = { startsAt: now, endsAt: now + r2.solveSec * 1000 };
   }
+}
+
+// Round lengths organisers can change before each timer starts; a running timer uses extendPhase instead.
+export const DURATIONS = {
+  round1: { round: 'r1', field: 'durationSec' },
+  round2_buy: { round: 'r2', field: 'buySec' },
+  round2_solve: { round: 'r2', field: 'solveSec' }
+};
+export const MAX_DURATION_MIN = 120;
+
+export function setDuration(state, phase, minutes) {
+  const target = DURATIONS[phase] ?? fail('Unknown timed phase.');
+  const mins = Number(minutes);
+  if (!Number.isInteger(mins) || mins < 1 || mins > MAX_DURATION_MIN) {
+    fail(`Enter a whole number of minutes from 1 to ${MAX_DURATION_MIN}.`);
+  }
+  if (PHASES.indexOf(state.phase) >= PHASES.indexOf(phase)) {
+    fail('That timer has already started. Use the +/− buttons to change the time left.', 409);
+  }
+  state.config[target.round][target.field] = mins * 60;
 }
 
 export function extendPhase(state, seconds) {

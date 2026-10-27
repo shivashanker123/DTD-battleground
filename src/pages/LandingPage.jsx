@@ -124,7 +124,7 @@ export const LandingPage = () => {
       <Section title="Round 3: Buzzer Final">
         <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
           <li>The top {r3.finalists} teams after Rounds 1 and 2 qualify and all start at 0. The final alone decides the winner.</li>
-          <li>15 live questions, about 30 minutes. The host shows and reads each one, then says “Buzzers open”. Buzzing before that does nothing.</li>
+          <li>15 live questions, about 15 minutes. The host shows and reads each one, then says “Buzzers open”. Buzzing before that does nothing.</li>
           <li>The first team to buzz answers within {r3.answerSec} seconds after the host names it. Correct +{r3.correct}; wrong or timeout {r3.wrong} (totals can go negative).</li>
           <li>After a wrong answer or timeout, that team is out for the question and one rebound goes to a different team, with the same scoring.</li>
           <li>Ties in the final: sudden death between the tied teams. If still tied, the higher qualifier wins.</li>
