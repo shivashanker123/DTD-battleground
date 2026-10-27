@@ -62,19 +62,20 @@ export const Countdown = ({ endsAt, now, label, urgentBelow = 10_000, size = 'md
 };
 
 export const QuestionBody = ({ question, large = false }) => (
-  <div className="space-y-3 text-left">
+  <div className="space-y-3 text-left select-none">
     <p className={`font-semibold text-slate-900 whitespace-pre-wrap ${large ? 'text-3xl leading-snug' : 'text-base'}`}>
       {question.prompt}
     </p>
     {question.code && (
       <pre
-        className={`bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto font-mono-code ${large ? 'text-2xl' : 'text-sm'}`}
+        className={`bg-slate-900 text-slate-100 rounded-xl p-4 overflow-x-auto font-mono-code select-none ${large ? 'text-2xl' : 'text-sm'}`}
       >
         {question.code}
       </pre>
     )}
   </div>
 );
+
 
 export const OptionList = ({ options, highlight, large = false }) => (
   <ol className={`grid gap-2 ${large ? 'sm:grid-cols-2 text-2xl' : 'text-sm'}`}>
