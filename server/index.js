@@ -11,6 +11,9 @@ import * as game from './game.js';
 import { loadQuestions } from './questions.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+try {
+  process.loadEnvFile();
+} catch {}
 const PORT = Number(process.env.PORT) || 3001;
 const DATA_DIR = process.env.DATA_DIR || path.join(here, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');

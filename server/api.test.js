@@ -15,7 +15,13 @@ async function startServer(dataDir) {
   const port = nextPort++;
   const proc = spawn(process.execPath, ['server/index.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_PASSWORD },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DATA_DIR: dataDir,
+      ADMIN_PASSWORD,
+      QUESTIONS_FILE: path.join(ROOT, 'server/questions.sample.json')
+    },
     stdio: ['ignore', 'ignore', 'pipe']
   });
   let stderr = '';
