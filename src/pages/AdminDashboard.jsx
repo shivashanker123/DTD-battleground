@@ -543,7 +543,7 @@ const FinalConsole = ({ s, now, run }) => {
             </p>
             <div className="flex gap-2">
               <button type="button" className={`${BTN} bg-emerald-600 text-white hover:bg-emerald-700`} onClick={() => run('/admin/r3/judge', { result: 'correct' })}>
-                Correct (+{s.config.r3.correct})
+                Correct (+{cur.attempts.length > 0 ? (s.config.r3.reboundCorrect ?? 35) : s.config.r3.correct})
               </button>
               <button type="button" className={DANGER} onClick={() => run('/admin/r3/judge', { result: 'wrong' })}>
                 Wrong ({s.config.r3.wrong})

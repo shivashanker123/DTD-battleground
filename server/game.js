@@ -30,7 +30,7 @@ export const DEFAULT_CONFIG = {
       hard: { cost: 40, points: 110, max: 5 }
     }
   },
-  r3: { finalists: 8, correct: 50, wrong: -20, answerSec: 10, maxAttempts: 2 }
+  r3: { finalists: 8, correct: 50, reboundCorrect: 35, wrong: -20, answerSec: 10, maxAttempts: 2 }
 };
 
 export class GameError extends Error {
@@ -667,12 +667,15 @@ export function judgeR3(state, result, now) {
   if (cur.status !== 'answering') fail('No team is answering.', 409);
   const { teamId } = cur.answering;
   const { correct, wrong, maxAttempts } = state.config.r3;
+  const reboundCorrect = state.config.r3.reboundCorrect ?? 35;
+  const isRebound = cur.attempts.length > 0;
+  const award = isRebound ? reboundCorrect : correct;
   const label = `Q${questionNumber(state)}`;
   const record = (delta, reason) => {
     if (!cur.practice) state.r3.log.push({ teamId, delta, reason, questionId: cur.questionId, at: now });
   };
   if (result === 'correct') {
-    record(correct, `${label} correct`);
+    record(award, `${label} ${isRebound ? 'rebound correct' : 'correct'}`);
     cur.status = 'done';
     cur.winner = teamId;
   } else if (result === 'wrong' || result === 'timeout') {

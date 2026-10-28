@@ -41,7 +41,7 @@ export const Round3Page = () => {
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Round 3</p>
         <h1 className="text-3xl font-black text-slate-900">Buzzer Final</h1>
         <p className="text-sm text-slate-600 mt-1">
-          {state.config.r3.finalists} finalists start from zero. Correct +{state.config.r3.correct}, wrong or timeout{' '}
+          {state.config.r3.finalists} finalists start from zero. Correct +{state.config.r3.correct} (rebound +{state.config.r3.reboundCorrect ?? 35}), wrong or timeout{' '}
           {state.config.r3.wrong}. You have {state.config.r3.answerSec} seconds once the host names your team.
         </p>
       </div>

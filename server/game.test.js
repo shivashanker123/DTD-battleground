@@ -292,3 +292,21 @@ test('buzzer practice runs the full flow without touching scores or numbering', 
   game.showR3Question(state, bank, 'f1', T0 + 100);
   assert.equal(game.questionNumber(state), 1);
 });
+
+test('rebound correct awards configured rebound points (35)', () => {
+  const { state, teams } = setup(2);
+  const [a, b] = teams;
+  game.lockFinalists(state, [a.id, b.id]);
+  game.setPhase(state, 'round3', T0);
+  game.showR3Question(state, bank, 'f1', T0);
+  game.openBuzzers(state, T0 + 10);
+  game.buzz(state, a, T0 + 20);
+  game.buzz(state, b, T0 + 30);
+  game.callNextTeam(state, T0 + 40);
+  game.judgeR3(state, 'wrong', T0 + 50);
+  game.callNextTeam(state, T0 + 60);
+  game.judgeR3(state, 'correct', T0 + 70);
+  const scores = Object.fromEntries(game.computeStandings(state).final.map((r) => [r.name, r.score]));
+  assert.equal(scores['Team 0'], -20);
+  assert.equal(scores['Team 1'], 35);
+});
