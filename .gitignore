@@ -25,7 +25,6 @@ dist-ssr
 
 # Battleground server: live event state and the real (secret) question bank
 server/data
-server/questions.json
 dtd-backup.json
 dtd-standings.csv
 
