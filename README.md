@@ -3,12 +3,13 @@
 A live three-round team quiz platform, built for the Data Science Club, JNTUH.
 Ran on Oct 26, 2026: 13 teams, 39 participants, on a local router network.
 
-![Event hall during DTD Battleground, Oct 26, 2026](docs/assets/event-hall.jpg)
+<img src="docs/assets/event-hall.jpg" alt="Event hall during DTD Battleground, Oct 26, 2026" width="650" />
+
 *The event hall: projector, TP-Link router on the desk (right), teams on their phones.*
 
 > Real question bank is not included (see `server/questions.sample.json`).
 
-![Admin dashboard](docs/assets/admin-dashboard.png)
+<img src="docs/assets/admin-dashboard.png" alt="Admin dashboard" width="650" />
 
 ## At a glance
 - Node.js (built-in `http`), React + Vite, in-memory state saved to `state.json`
@@ -39,10 +40,12 @@ Details: [decisions](docs/decisions.md) ([PDF](docs/DTD%20Battleground_%20Decisi
 | Person | Contribution |
 |---|---|
 | Ganesh | Initial prototype |
-| Chiranjeevi | Platform build (with Claude), leaderboard control, queue change |
-| Revanth | Ran the server on event day |
-| Shivashanker | Requirements and rules, architecture and trade-off decisions, load testing, security review findings, hosting |
+| Chiranjeevi | Built the platform from my requirements (admin console, participant app), AI-assisted with Claude. Implemented the leaderboard release control and the larger sign-in queue. |
+| Revanth | Ran the server from his laptop on event day |
+| Shivashanker | Wrote the requirements and game rules, made the architecture and trade-off decisions, ran the load tests and security review, hosted the event |
 | Abhinav | Shortlisted questions for final quiz question bank |
+
+Much of the code was written with AI assistance (Claude, and Codex for implementation and review). My part was the requirements, design decisions, review and testing, and I can explain the design choices in this repo.
 
 ## Run locally
 
