@@ -3,6 +3,9 @@
 A live three-round team quiz platform, built for the Data Science Club, JNTUH.
 Ran on Oct 26, 2026: 13 teams, 39 participants, on a local router network.
 
+![Event hall during DTD Battleground, Oct 26, 2026](docs/assets/event-hall.jpg)
+*The event hall: projector, TP-Link router on the desk (right), teams on their phones.*
+
 > Real question bank is not included (see `server/questions.sample.json`).
 
 ![Admin dashboard](docs/assets/admin-dashboard.png)

@@ -6,6 +6,9 @@
 - Planned 5:00 pm, started about 5:30 (late joiners, first club event of the year), finished 6:40 pm.
 - No website problems. Admin dashboard screenshots taken during the event.
 
+![Hosting and running the server](assets/host-podium.jpg)
+*Hosting the event from the podium, Oct 26, 2026.*
+
 ## Rounds
 - **Round 1:** configured 30 min on the server laptop. Teams finished in about 20 min, so I closed it from the admin console.
 - **Round 2:** same, about 20 min.
