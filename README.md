@@ -1,15 +1,24 @@
 # DTD Battleground
 
-A live three-round team quiz platform, built for the Data Science Club, JNTUH.
-Ran on Oct 26, 2026: 13 teams, 39 participants, on a local router network.
+A live three-round team quiz platform, built for the Data Science Club, JNTUH.  
+Ran on Oct 26, 2026: 13 teams (plus one internal test team), 39 participants, on a local router network.
 
 <img src="docs/assets/event-hall.jpg" alt="Event hall during DTD Battleground, Oct 26, 2026" width="650" />
 
 *The event hall: projector, TP-Link router on the desk (right), teams on their phones.*
 
+## Highlights
+- **Ran live:** 13 teams (plus one internal test team), 39 participants, 3 rounds, about 70 minutes, no website problems.
+- **Load-tested:** 1000 simulated pollers, p95 1.92 ms, 0% errors (localhost, one laptop).
+- **Found and fixed a blocking bug:** polls took seconds during a registration burst. Async hashing and batched writes cut poll p95 from about 4–12 s to under 1 s in my runs.
+- **Security review:** an admin-auth bypass (`Bearer constructor`) and a standings leak, both fixed with tests.
+- **Honest limits:** no `fsync`, one process, no fairness check on the buzzer yet. See [roadmap](docs/roadmap.md).
+
 > Real question bank is not included (see `server/questions.sample.json`).
 
 <img src="docs/assets/admin-dashboard.png" alt="Admin dashboard" width="650" />
+
+*Admin dashboard: phase controls, live timer extension, question preview, and audit log.*
 
 ## At a glance
 - Node.js (built-in `http`), React + Vite, in-memory state saved to `state.json`
@@ -18,23 +27,34 @@ Ran on Oct 26, 2026: 13 teams, 39 participants, on a local router network.
 - Load-tested with k6 (localhost, direction only)
 
 ## Architecture
+
+<img src="docs/assets/architecture-DTD.png" alt="DTD Battleground event architecture" width="700" />
+
+<details>
+<summary>Text diagram (Mermaid)</summary>
+
 ```mermaid
 flowchart LR
   P[Phones] --> R[TP-Link router] --> S[Node server]
   S --> M[(In-memory state)] --> F[state.json]
 ```
+</details>
+
 More: [architecture](docs/architecture.md)
 
-## Key decisions
-- Async hashing and backpressure
-- Group commit: reply only after the change is saved
-- Polling instead of WebSockets
-- Local server instead of Vercel
-- Leaderboard hidden until admin publishes  
-Details: [decisions](docs/decisions.md) ([PDF](docs/DTD%20Battleground_%20Decisions%20and%20Trade-offs.pdf)) · [design change log](docs/design-change-log.md)
+## Key decisions & results
+- **Async hashing:** cut registration burst poll p95 from 4–12 s to ~0.79 s
+- **Group commit:** reply only after the change is written and renamed (survives a process crash; no fsync)
+- **Polling over WebSockets:** simple client reconnection and watchdog on venue Wi-Fi without server connection tracking
+- **Local server instead of Vercel:** single-process in-memory state, zero cloud cost, works completely offline
+- **Leaderboard hidden until admin publishes:** prevents qualification ranking spoilers before Round 3  
+Details: [decisions](docs/decisions.md) ([PDF](docs/DTD-Tradeoff-Decisions.pdf)) · [design change log](docs/design-change-log.md)
 
-## Results and what went wrong
-[load-testing](docs/load-testing.md) · [event report](docs/event-report.md) · [security review](docs/security-review.md)
+## Results & what went wrong
+- **Load testing:** simulated 1000 concurrent pollers with sub-3 ms latency; stress-tested registration burst with 256-slot queue.
+- **Version drift on event day:** I committed 20-minute rounds before the event, but a teammate's local copy still had 30 minutes. Under stage pressure when my laptop had startup trouble, we ran from his un-synced copy.
+- **What I'd change:** deploy strictly from a git tag, provide a single start script, rehearse directly on the event laptop, and display the active commit hash and round lengths on the admin console.  
+Full reports: [load-testing](docs/load-testing.md) · [event report](docs/event-report.md) · [security review](docs/security-review.md)
 
 ## Contributors
 | Person | Contribution |
@@ -42,12 +62,13 @@ Details: [decisions](docs/decisions.md) ([PDF](docs/DTD%20Battleground_%20Decisi
 | Ganesh | Initial prototype |
 | Chiranjeevi | Built the platform from my requirements (admin console, participant app), AI-assisted with Claude. Implemented the leaderboard release control and the larger sign-in queue. |
 | Revanth | Ran the server from his laptop on event day |
-| Shivashanker | Wrote the requirements and game rules, made the architecture and trade-off decisions, ran the load tests and security review, hosted the event |
+| Shivashanker | Wrote the requirements and game rules, made the architecture and trade-off decisions, re-ran and interpreted the load tests, reviewed the code for security issues, hosted the event |
 | Abhinav | Shortlisted questions for final quiz question bank |
 
 Much of the code was written with AI assistance (Claude, and Codex for implementation and review). My part was the requirements, design decisions, review and testing, and I can explain the design choices in this repo.
 
-## Run locally
+<details>
+<summary><b>Run locally (Prerequisites, setup, and dev mode)</b></summary>
 
 ### 1. Prerequisites
 - **Node.js**: v20 or higher (`node -v`)
@@ -103,6 +124,8 @@ npm run server   # Node backend with auto-reload (--watch) on port 3001
 ```bash
 npm test
 ```
+
+</details>
 
 ## Status
 v0.1 shipped. v0.2 proposed: [roadmap](docs/roadmap.md)

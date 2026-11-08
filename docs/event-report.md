@@ -1,7 +1,7 @@
 # Event report: Oct 26, 2026
 
 ## Facts
-- 13 teams, 39 participants, TP-Link router (from the HOD), server on a teammate's laptop.
+- 13 teams (plus one internal test team), 39 participants, TP-Link router (from the HOD), server on a teammate's laptop.
 - [FILL: number of devices, venue]
 - Planned 5:00 pm, started about 5:30 (late joiners, first club event of the year), finished 6:40 pm.
 - No website problems. Admin dashboard screenshots taken during the event.

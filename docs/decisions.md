@@ -1,7 +1,7 @@
 # DTD Battleground: Decisions and Trade-offs
 
 *Written Oct 2026 before the event. Updated Nov 2026 with event results.*  
-*PDF version available for download: [DTD Battleground_ Decisions and Trade-offs.pdf](./DTD%20Battleground_%20Decisions%20and%20Trade-offs.pdf)*  
+*PDF version available for download: [DTD-Tradeoff-Decisions.pdf](./DTD-Tradeoff-Decisions.pdf)*  
 *For incremental commit logs and implementation review notes, see [design-change-log.md](./design-change-log.md).*
 
 ---
