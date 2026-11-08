@@ -11,7 +11,7 @@
 Credit: [FILL: who found each, write only what you can back up].
 
 ## Controls in place
-scrypt + salt, timing-safe compare, separate admin and team sessions, 10 failed logins per IP+team = 5 min lock, 64 KB body limit, answers never sent to browsers.
+scrypt + salt, timing-safe compare, separate admin and team sessions, 10 failed logins per IP+team = 5 min lock, 64 KB body limit, answers never sent to browsers, client anti-copy protection (`select-none` on questions and code).
 
 ## Known gaps (verified in code)
 - No registration rate limit, no team cap

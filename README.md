@@ -61,7 +61,7 @@ Full reports: [load-testing](docs/load-testing.md) · [event report](docs/event-
 |---|---|
 | Ganesh | Initial prototype |
 | Chiranjeevi | Built the platform from my requirements (admin console, participant app), AI-assisted with Claude. Implemented the leaderboard release control and the larger sign-in queue. |
-| Revanth | Ran the server from his laptop on event day |
+| Revanth | Ran the server from his laptop on event day, added client-side anti-copy protection (`select-none` on questions and code) |
 | Shivashanker | Wrote the requirements and game rules, made the architecture and trade-off decisions, re-ran and interpreted the load tests, reviewed the code for security issues, hosted the event |
 | Abhinav | Shortlisted questions for final quiz question bank |
 
